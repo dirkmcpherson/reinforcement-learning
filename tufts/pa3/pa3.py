@@ -5,6 +5,7 @@ from IPython import embed
 import random
 from Gridworld import Gridworld
 from Agent import Agent
+from time import time
 import random
 
 # Actions is global (bad design)
@@ -51,16 +52,67 @@ def takeActionFn(gridworld, actionKey):
 class QLearner():
     def __init__(self):
         self.agent = Agent(Actions)
-        # embed()
         self.world = Gridworld(self.agent, self, self.manualActionSelection)
         self.Q = np.zeros((self.world.Width, self.world.Height, len(Actions))) # initialize q table to zeros
+
         # self.world.show()
 
         self.rewards = []
         self.cumulativeReward = 0
+
+        self.model = self.BuildModel()
     
     def Step(self):
-        self.basicQPolicy(self.world, self.Q)
+        # self.basicQPolicy(self.world, self.Q)
+        self.DynaQPolicy(self.world, self.Q)
+
+    def SelectModelStateAction(self):
+        #random for placeholder
+        s = [random.randint(0, self.world.Width - 1), random.randint(0, self.world.Height - 1)]
+        a = random.randint(0, len(Actions) - 1)
+        return s, a
+
+    # The model is structurally the same as the Q table, but Model[S,A] -> S' rather than a value
+    def BuildModel(self):
+        model = np.zeros((self.world.Width, self.world.Height, len(Actions), 2)) # Every S,A pair should give rise to an S', we could add R here, but instead we'll use the real Q table (that _should_ be the same thing)
+        
+        # now initialize the model so that every transition leads to S (which we'll update as we actually explore)
+        # doin it the loooong way
+        w = self.world.Width
+        h = self.world.Height
+        A = len(Actions)
+        for x in range(w):
+            for y in range(h):
+                for a in range(A):
+                    model[x][y][a] = [x,y] # S' starts out as S
+        
+        return model.astype(int)
+
+    # Our model can be deterministic, which greatly simplifies things
+    def ModelStep(self):
+        # For Dyna-Q, we simulate a randomly previously observed state and action and update their reward in the Q table
+        s, a = self.SelectModelStateAction()
+
+        s_prime = self.model[s[0]][s[1]][a]
+        self.UpdateQ(s, a, s_prime, 0)
+
+
+    def UpdateQ(self, s, a, s_prime, reward):
+        # if (np.max(self.Q[s[0]][s[1]][a]) >= 99.9):
+        #     embed()
+
+        x,y = s
+        xNew, yNew = s_prime
+        # Dont do an update if you're entering the terminal state (special case handled by policy)
+        if (self.world.IsGoalState(xNew,yNew)):
+            return
+
+        alpha = 1.0
+        gamma = 0.5
+        currentExpectedValue = self.Q[x][y][a]
+        newExpectedValue = np.max(self.Q[xNew][yNew][:])
+        error = newExpectedValue - currentExpectedValue
+        self.Q[x][y][a] = currentExpectedValue + alpha * (reward + (gamma * error))
 
     def PrintQ(self):
         # For debugging go through the Q and pix the max state action
@@ -73,6 +125,8 @@ class QLearner():
 
         for entry in debuggingView:
             print(entry)
+
+        print("--------------------")
     
     def RestartEpisode(self):
         self.world.Reset()
@@ -81,9 +135,60 @@ class QLearner():
     def manualActionSelection(self, gridworld, actionKey):
         self.basicQPolicy(gridworld, self.Q, actionKey)
 
+    def DynaQPolicy(self, gridworld, Q, manualActionKey = None):
+        endTime = time() + 0.01 # update at 100hz   
+
+        agent = gridworld.agent
+        x,y = agent.position
+        # a0 = agent.history[-1][1] # action part of history
+
+        actionKey = None
+        if (manualActionKey):
+            actionKey = manualActionKey
+            print("Took action key ",actionKey)
+        else:
+            # whats the best action we could take from here?
+            if (random.random() >= 0.1):
+                actionKey = random.randint(0, len(Actions) - 1)
+            else:
+                actionKey = np.argmax(Q[x][y][:])
+
+        # Take that action
+        takeActionFn(gridworld, actionKey)
+        xNew, yNew = agent.position
+
+        # update our model of S,A,S'
+        self.model[x][y][actionKey] = [xNew, yNew]
+
+        # Update your previous state with the new reward TD(0)
+        reward = agent.GetAndResetReward()
+
+        # Agent only gets direct rewared on episode completion
+        # Hack to recognize end of episodes by reward
+        if (reward > 0):
+            print ("End of episode!")
+            self.cumulativeReward += reward
+            self.Q[x][y][actionKey] = reward # action key here actually doesn't matter (and really shouldnt be included) but since we do a max over the next state, filling out the action values for the terminal state "shouldnt" have side-effects
+            self.RestartEpisode()
+            self.PrintQ()
+        else:
+            self.UpdateQ([x,y], actionKey, [xNew, yNew], reward)
+
+        
+        self.rewards.append(self.cumulativeReward)
+
+        modelSteps = 0
+        while (time() - endTime < 0):
+            self.ModelStep()
+            modelSteps = modelSteps + 1
+        
+        print("ModelSteps ", modelSteps)
+
+        self.PrintQ()   
+
+
     def basicQPolicy(self, gridworld, Q, manualActionKey = None):
         agent = gridworld.agent
-        s0 = agent.position
         x,y = agent.position
         # a0 = agent.history[-1][1] # action part of history
 
@@ -115,70 +220,12 @@ class QLearner():
             self.Q[x][y][actionKey] = reward # action key here actually doesn't matter (and really shouldnt be included) but since we do a max over the next state, filling out the action values for the terminal state "shouldnt" have side-effects
             self.RestartEpisode()
         else:
-            currentExpectedValue = Q[x][y][actionKey]
-            newExpectedValue = np.max(Q[xNew][yNew][:])
-            error = newExpectedValue - currentExpectedValue
-            self.Q[x][y][actionKey] = currentExpectedValue + alpha * (reward + (gamma * error))
+            self.UpdateQ([x,y], actionKey, [xNew, yNew], reward)
+
 
         
         self.rewards.append(self.cumulativeReward)
-        self.PrintQ()
-
-        print("--------")
-        
-        # if (reward > 0):
-        #     print ("End of episode!")
-        #     # self.Q[xNew][yNew][actionKey] = reward # action key here actually doesn't matter (and really shouldnt be included) but since we do a max over the next state, filling out the action values for the terminal state "shouldnt" have side-effects
-        #     self.RestartEpisode()
-
-        #     # For debugging go through the Q and pix the max state action
-        #     debuggingView = []
-        #     for i in range(len(Q[0])):
-        #         row = []
-        #         for j in range(len(Q)):
-        #             row.append(np.max(Q[j][i]))
-        #         debuggingView.append(row)
-
-        #     for entry in debuggingView:
-        #         print(entry)
-        # for entry in reversed(self.Q):
-        #     print(entry)
-
-    # sa_key = hashStateAction(s0, a0)
-
-    ## TODO: If agent reward is not zero it just got something, thats the base of the update
-    # reward = agent.GetAndResetReward()
-    # if (reward > 0):
-    #     Q[sa_key] = reward
-
-    # for state, action in agent.history:
-    #     blah = None
-        
-
-    # if (a0 in Q):
-        # Update value
-    # else:
-        # Set value to 
-
-# def basicQLearning():
-#     agent = Agent(Actions)
-#     world = Gridworld(agent, takeActionFn, True)
-
-#     numActions = len(agent.Actions)
-#     Q = np.zeros(world.Width, world.Height, numActions) # initialize q table to zeros
-
-#     print("Is this happening? NOPE")
-#     # Initialize episode
-#     for i in range(100):
-#         # Take action
-#         action = basicQPolicy(agent, Q)
-
-#         # update Q table
-
-#     print
-        
-
-        
+        self.PrintQ()   
 
 
 if __name__ == '__main__':
@@ -187,15 +234,15 @@ if __name__ == '__main__':
     # basicQLearning()
     learner = QLearner()
 
-    for i in range(10000):
+    for i in range(100):
         learner.Step()
 
-    plt.xlabel('Time Steps')
-    plt.ylabel('Cumulative Reward')
-    x = [i for i in range(len(learner.rewards))]
-    y = learner.rewards
-    # plt.title('Bonus Reward over time for unvisited state-actions.')
-    plt.plot(x,y)
-    plt.show()
+    # plt.xlabel('Time Steps')
+    # plt.ylabel('Cumulative Reward')
+    # x = [i for i in range(len(learner.rewards))]
+    # y = learner.rewards
+    # # plt.title('Bonus Reward over time for unvisited state-actions.')
+    # plt.plot(x,y)
+    # plt.show()
 
 

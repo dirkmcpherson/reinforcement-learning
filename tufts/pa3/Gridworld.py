@@ -24,20 +24,20 @@ class Gridworld:
 
         self.root = Tk()
 
-        # self.world = [
-        #     [0,1,0],
-        #     [0,1,1],
-        #     [0,0,GOAL]
-        # ]
         self.world = [
-            [0,0,1,1,1,1,1,1,1],
-            [0,0,0,0,0,0,0,0,0],
-            [0,1,1,1,1,1,1,1,0],
-            [0,0,0,0,0,0,0,0,0],
-            [0,1,1,1,1,0,0,1,0],
-            [0,1,1,1,1,0,0,1,1],
-            [0,0,0,0,1,0,0,0,GOAL]
+            [0,1,0],
+            [0,1,1],
+            [0,0,GOAL]
         ]
+        # self.world = [
+        #     [0,0,1,1,1,1,1,1,1],
+        #     [0,0,0,0,0,0,0,0,0],
+        #     [0,1,1,1,1,1,1,1,0],
+        #     [0,0,0,0,0,0,0,0,0],
+        #     [0,1,1,1,1,0,0,1,0],
+        #     [0,1,1,1,1,0,0,1,1],
+        #     [0,0,0,0,1,0,0,0,GOAL]
+        # ]
         self.StartPosition = (0,0)
 
         # TODO: UPDATE THESE WHEN MAP CHANGES
@@ -122,6 +122,9 @@ class Gridworld:
 
         if (self.display):
             self.agentIcon = self.grid.create_oval(x * self.pw + x_offset, y * self.pw + y_offset, (x+1) * self.pw - x_offset, (y+1) * self.pw - y_offset, fill = 'yellow')
+
+    def IsGoalState(self,x,y):
+        return self.world[x][y] == GOAL
 
     def GoalState(self):
         return self.world[self.agent.position[0], self.agent.position[1]] == GOAL
