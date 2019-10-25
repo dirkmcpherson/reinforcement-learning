@@ -14,4 +14,9 @@ class Agent:
     def Reward(self, r):
         self.reward = r
 
+    def GetAndResetReward(self):
+        ret = self.reward
+        self.reward = 0
+        return ret
+
     

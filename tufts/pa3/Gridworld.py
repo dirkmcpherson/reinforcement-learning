@@ -5,10 +5,13 @@ WALL = 1
 GOAL = 2
 
 class Gridworld:
-    def __init__(self, agent, actionFn, show = False):
+    def __init__(self, agent, learner, actionFn):
+        self.learner = learner # so ugly
+
+        self.display = False
         self.canvas = None
-        self.pw = 100
-        self.ph = 100
+        self.pw = 25
+        self.ph = 25
 
         self.actionFn = actionFn
 
@@ -21,20 +24,26 @@ class Gridworld:
 
         self.root = Tk()
 
+        # self.world = [
+        #     [0,1,0],
+        #     [0,1,1],
+        #     [0,0,GOAL]
+        # ]
         self.world = [
-            [0,1,0],
-            [0,1,1],
-            [0,0,GOAL]
+            [0,0,1,1,1,1,1,1,1],
+            [0,0,0,0,0,0,0,0,0],
+            [0,1,1,1,1,1,1,1,0],
+            [0,0,0,0,0,0,0,0,0],
+            [0,1,1,1,1,0,0,1,0],
+            [0,1,1,1,1,0,0,1,1],
+            [0,0,0,0,1,0,0,0,GOAL]
         ]
         self.StartPosition = (0,0)
 
         # TODO: UPDATE THESE WHEN MAP CHANGES
         self.Width = len(self.world)
-        self.Height = len(self.world[0])
-
-        if (show):
-            self.show()
-        
+        self.Height = len(self.world[0])  
+    
     def close(self, event):
         print("close")
         self.root.destroy()
@@ -64,13 +73,14 @@ class Gridworld:
         if not actionKey:
             print("ERROR: input did not correspond to action.")
 
-        self.actionFn(self, actionKey)
+        self.learner.manualActionSelection(self, actionKey)
 
     def bindKeys(self):
         self.root.bind('<Escape>', self.close)
         self.root.bind('<Key>', self.acceptInput)
 
     def show(self):
+        self.display = True
         self.grid = Canvas(self.root, width=self.pw*self.Width, height=self.pw*self.Height)
 
         self.bindKeys()
@@ -98,6 +108,7 @@ class Gridworld:
             noChange = True
         elif (self.world[x][y] == GOAL):
             print("Yay! Goal! {}".format(self.agent.history))
+            self.agent.Reward(100)
 
         if (noChange):
             return
@@ -108,7 +119,9 @@ class Gridworld:
 
         x_offset = self.pw * 0.75
         y_offset = self.ph * 0.75
-        self.agentIcon = self.grid.create_oval(x * self.pw + x_offset, y * self.pw + y_offset, (x+1) * self.pw - x_offset, (y+1) * self.pw - y_offset, fill = 'yellow')
+
+        if (self.display):
+            self.agentIcon = self.grid.create_oval(x * self.pw + x_offset, y * self.pw + y_offset, (x+1) * self.pw - x_offset, (y+1) * self.pw - y_offset, fill = 'yellow')
 
     def GoalState(self):
         return self.world[self.agent.position[0], self.agent.position[1]] == GOAL
