@@ -1,0 +1,68 @@
+Planning and Learning With Tabular Methods
+
+\section{Background}
+
+Tabular learning is a reinforcement learning technique that stores and updates the expected rewards of state-actions in a table. An agent in state $S$ takes and action $A$ to transition to state $S'$ and earned reward $R$. Q-learning is the simplest version of one-step tabular learning. The agent selects an action and updates the value of its current state-action based on the reward gained by the transition and the difference between the maximum value of the next state and the value of the current state-action (eqn \ref{eqn:Qupdate}. Q-learning follows an $\epsilon-greedy$ policy that, when selecting greedily, chooses the state-action with the greatest value in the table. Over many episodes the agent learns which state-actions have high value by propagating any reward it finds throughout the table.
+
+\begin{equation}\label{eqn:Qupdate}
+    \alpha \leftarrow \textit{Learning Rate}
+    \gamma \leftarrow \textit{Discount Factor}
+    Q(S,A) = Q(S,A) + \alpha * [R + \gamma * \maxQ(S',a) - Q(S,A)]
+\end{equation}
+
+
+One-step tabular Q-learning only learns when it interacts directly with the environment (\textit{acting}), but other tabular methods keep an updated model of the environment in order to simulate experience ()\textit{planning}). Agents update their values functions and policies using both the real and simulated experiences. Acting updates an agent's model of the environment, and planning allows the agent to learn faster than if it just acted alone. 
+
+
+\subsection{Dyna-Q}
+
+Dyna-Q \cite{sutton_introduction_1998} is tabular learning method exactly the same as the Q-Learning algorithm described above with the important exception that it plans in the background. Every time the agent takes an action it updates its model of the environment. Its model tells it the transition $(S,A,S',R)$ for every state-action the agent has taken while acting. The agent simulates $n$ steps using this model for every action it takes in the environment, allowing th e
+
+\begin{algorithm}
+    \caption{Tabular Dyna-Q}\label{alg:dynaq}
+    \begin{algorithmic}
+      \STATE Initialize Q(s, a) and Model(s, a) for all $s \in S$ and $a \in A(s)$
+      \WHILE{True}
+        \STATE $S \leftarrow$ current (nonterminal) state
+        \STATE $A \leftarrow \epsilon-greedy(S,Q)$
+        \STATE Execute action $A$; observe resultant reward, $R$, and state, $S'$
+        \STATE $Q(S,A) \leftarrow Q(S,A) + \alpha[R + \gamma max_a Q(S',a) - Q(S,A))]$
+        \STATE $Model(S,A) \leftarrow R,S'$ (assuming deterministic environment)
+        \STATE Repeat $n$ times:
+        \bindent
+          \STATE $S \leftarrow$ random previously observed state
+          \STATE $A \leftarrow$ random action previously taken in $S$
+          \STATE $R,S' \leftarrow Model(S,A)$
+          \STATE $Q(S,A) \leftarrow Q(S,A) + \alpha[R + \gamma max_a Q(S',a) - Q(S,A))]$
+        \eindent
+      \ENDWHILE
+    \end{algorithmic}
+  \end{algorithm}
+
+
+\begin{equation}\label{eqn0}
+    \kappa \sqrt{\tau}
+\end{equation}
+
+
+\section{Dyna-Q+}
+
+We found that in larger maps, Dyna-Q would actually beat out Dyna-Q+ before the map was changed. This was because Dyna-Q+'s planning steps would increase the value of visited states above zero. This behavior is intended, but it causes the agent to select previously selected actions \textit{before} unselected action (assuming the unselected actions had not been updated in the planning phase). For large maps, Dyna-Q+ would cycle back over its previous paths over and over again while Dyna-Q would eventually reach the goal. This behavior was not observed for smaller maps. To correct for this, Dyna-Q+ would begin its planning update only after some number of steps. In other words, Dyna-Q would become Dyna-Q+ after it already had some experience finding the goal. 
+
+Rather than incrementing every state-action pair that was \textit{not} visited this timestep, we track how long we've been running the algorithm. We save the timestep during which a state was visited in the history object. Then, when we calculate the reward show in equation \ref{eqn0} tau is the difference between the current timestep and the timestep we last visited the state. 
+
+
+\section{Experiment Design}
+
+We aim to determine the effects of altering where the recency reward is used in the Dyna-Q+ algorithm. In Dyna-Q+ we add the recency reward (eqn. \ref{eqn0}) to our updates for the Q table only on model updates. These small amounts of reward accumulate until old paths are worth enough to merit exploration. 
+
+We introduce a variant of the Dyna-Q+ (VDQ+) algorithm that uses the recency reward when the agent is taking an action. Instead of accumulating, this reward dissipates as soon as the agent selects the state-action. The Q-table is never altered by the recency reward, and so it ends up looking much more like the Dyna-Q table than the Dyna-Q+ table. 
+
+\subsection{Hypothesis}
+
+The recency rewards for VDQ+ do not accumulate in the Q-table, so we expect to see less overall exploration than for Dyna-Q+ which sees unvisited states gain value over the entire lifetime of the algorithm. VDQ+ should instead explore periodically. Once a path of state-actions is old enough VDQ+ will search along it and reset its bonus values to zero. Those values will then slowly build up until they're worth searching again. Overall fewer explorations will occur because the earlier state-actions in these paths will have their bonus-value erased once they're visited. The later branches in these paths are only reachable from the earlier state-actions, so the branching factor prevents all of these paths from being visited (i.e. the 'entrance' states to these paths will be periodically visited, but each 'entrance' state leads to multiple paths). 
+
+
+\subsection{Results}
+
+\section{Conclusion}

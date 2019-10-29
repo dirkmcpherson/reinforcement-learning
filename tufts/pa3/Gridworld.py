@@ -5,15 +5,13 @@ WALL = 1
 GOAL = 2
 
 class Gridworld:
-    def __init__(self, agent, learner, actionFn):
+    def __init__(self, agent, learner):
         self.learner = learner # so ugly
 
         self.display = False
         self.canvas = None
         self.pw = 25
         self.ph = 25
-
-        self.actionFn = actionFn
 
         self.agent = agent
         self.agentIcon = None
@@ -23,12 +21,39 @@ class Gridworld:
         self.colorMap = {0: 'white', 1: 'black', 2: 'green'}
 
         self.root = Tk()
+        self.root.withdraw() # dont show the window (prevents tiny window popup in multiple trials)
 
-        self.world = [
-            [0,1,0],
-            [0,1,1],
-            [0,0,GOAL]
-        ]
+        # self.world = [
+        #     [0,0,0,0],
+        #     [0,0,0,0],
+        #     [0,0,0,0],
+        #     [0,0,0,GOAL]
+        # ]
+        # self.alternateWorld = [
+        #     [0,0,0,0],
+        #     [0,0,0,0],
+        #     [0,0,0,0],
+        #     [0,0,0,GOAL]
+        # ]
+
+        # self.alternateWorld = [
+        #     [0,0,0,0],
+        #     [0,0,0,0],
+        #     [0,1,1,1],
+        #     [0,0,0,GOAL]
+        # ]
+
+        # self.world = [
+        #     [0,1,0],
+        #     [0,1,1],
+        #     [0,0,GOAL]
+        # ]
+
+        # self.alternateWorld = [
+        #     [0,0,0],
+        #     [0,0,0],
+        #     [1,1,GOAL]
+        # ]
         # self.world = [
         #     [0,0,1,1,1,1,1,1,1],
         #     [0,0,0,0,0,0,0,0,0],
@@ -38,6 +63,34 @@ class Gridworld:
         #     [0,1,1,1,1,0,0,1,1],
         #     [0,0,0,0,1,0,0,0,GOAL]
         # ]
+
+        # self.alternateWorld = [
+        #     [0,0,1,1,1,1,1,1,1],
+        #     [0,0,0,0,0,0,0,0,0],
+        #     [1,1,1,1,0,1,1,1,0],
+        #     [0,0,0,0,0,0,0,1,0],
+        #     [0,1,1,0,1,1,1,1,0],
+        #     [0,1,1,0,1,0,0,1,1],
+        #     [0,0,0,0,0,0,0,0,GOAL]
+        # ]
+        self.world = [
+            [0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0],
+            [1,1,1,1,1,1,1,1,0],
+            [0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0],
+            [GOAL,0,0,0,0,0,0,0,0]
+        ]
+        self.alternateWorld = [
+            [0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0],
+            [1,0,1,1,1,1,1,1,0],
+            [0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0],
+            [GOAL,0,0,0,0,0,0,0,0]
+        ]
         self.StartPosition = (0,0)
 
         # TODO: UPDATE THESE WHEN MAP CHANGES
@@ -47,6 +100,10 @@ class Gridworld:
     def close(self, event):
         print("close")
         self.root.destroy()
+
+    def swapWorlds(self):
+        self.world = self.alternateWorld # world with different paths throught it
+        self.learner.lookingForNextWin = True
 
     def acceptInput(self, event):
         # print("Accepting {}".format(event.char))
@@ -102,13 +159,13 @@ class Gridworld:
         (x,y) = pos
         noChange = False
         if (x < 0 or y < 0 or x >= self.Width or y >= self.Height):
-            print("ERROR: invalid agent position {} in world of size {}".format((x,y), (self.Width, self.Height)))
+            # print("ERROR: invalid agent position {} in world of size {}".format((x,y), (self.Width, self.Height)))
             noChange = True
         elif (self.world[x][y] == WALL):
             noChange = True
         elif (self.world[x][y] == GOAL):
-            print("Yay! Goal! {}".format(self.agent.history))
-            self.agent.Reward(100)
+            # print("Yay! Goal! {}".format(self.agent.history))
+            self.agent.Reward(self.learner.goalreward)
 
         if (noChange):
             return
@@ -132,8 +189,20 @@ class Gridworld:
     def Reset(self):
         self.moveAgentTo(self.StartPosition)
 
+    def PrintWorld(self):
+        for row in self.world:
+            print(row)
+
 
 
 if __name__ == '__main__':
-    a = Agent()
+    Actions = {
+        0: [1,0],
+        1: [-1,0],
+        2: [0,1],
+        3: [0,-1]
+    }
+    a = Agent(Actions)
     gw = Gridworld(a, True)
+    gw.show()
+
