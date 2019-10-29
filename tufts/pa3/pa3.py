@@ -62,7 +62,7 @@ class QLearner():
             self.updatePolicy = self.DynaQPolicy
 
         # For Dyna-Q
-        self.numModelUpdates = 20
+        self.numModelUpdates = 50
         self.model = self.BuildModel()
 
         # For Dyna-Q+, a table of how long its been since a state-action was visited, and an incrementer for easy addition
@@ -103,7 +103,9 @@ class QLearner():
     def SelectModelStateActionDynaQ(self):
         #random for placeholder
         s = random.choice(list(self.history.keys()))
-        a = self.random.randint(0, len(Actions) - 1)
+        actionCounts = self.history[s]
+        a = self.random.choice( np.argwhere(actionCounts != 0) )[0]
+        # a = self.random.randint(0, len(Actions) - 1)
         return s, a
 
     # The model is structurally the same as the Q table, but Model[S,A] -> S' rather than a value
@@ -130,7 +132,7 @@ class QLearner():
     def ModelStep(self):
         # For Dyna-Q, we simulate a randomly previously observed state and action and update their reward in the Q table
         r = 0 
-        if (self.PLUS) and (self.timestep > 1000) and not (self.EXPERIMENT):
+        if (self.PLUS) and not (self.EXPERIMENT): #and (self.timestep > 1000):
             s, a, r = self.SelectModelStateActionDynaQPlus()
             # print("plus update reward ", r)
         else:
@@ -148,7 +150,7 @@ class QLearner():
         #     print("Model updated Q from {:6.2f} to {:6.2f}".format(before, after))
 
     def RecencyBonus(self,x,y,a):
-        k = 0.0001
+        k = 0.001
 
         # if you've never tried the queried state-action (For experiment) give a large number
         timeSince = 0
@@ -162,9 +164,6 @@ class QLearner():
         return k * np.sqrt(dt)
 
     def UpdateQ(self, s, a, s_prime, reward, PLUS_MODEL = False):
-        # if (np.max(self.Q[s[0]][s[1]][a]) >= 99.9):
-        #     embed()
-
         x,y = s
         xNew, yNew = s_prime
         # Dont do an update if you're entering the terminal state (special case handled by policy)
@@ -180,7 +179,8 @@ class QLearner():
         self.Q[x][y][a] = currentExpectedValue + alpha * (reward + error)
 
     def PrintQ(self, Q = "blarg"):
-        if Q == "blarg":
+        # allow for manual entry of a Q table
+        if Q == "blarg": 
             Q = self.Q
         # For debugging go through the Q and pix the max state action
         debuggingView = []
@@ -203,6 +203,7 @@ class QLearner():
         # for dyna-q+, update history
         # self.history = self.history + (1 * (self.history != -1)) # only increment valid values (visited values)
 
+        # Update the history
         x,y = self.agent.position
         if ((x,y) in self.history.keys()):
             self.history[(x,y)][actionKey] = self.timestep
@@ -210,13 +211,6 @@ class QLearner():
             actionHistory = np.zeros(len(Actions))
             actionHistory[actionKey] = self.timestep
             self.history[(x,y)] = actionHistory
-
-            # This is a hack, but the unvisited state-actions need to take priority over the visited ones
-            #  otherwise there's some non-zero value for a visited state that causes it to be visited over a never-before visited state-action
-            # This hack at least gives those states an initial q-value. Does this break the dyna-q+ algorithm
-            # if (self.PLUS and not self.EXPERIMENT):
-            #     self.Q[x][y][:] = [self.RecencyBonus(x,y,a) for a in range(len(Actions))]
-            #     print("initial vals {}".format(self.Q[x][y][:]))
 
         (dx, dy) = Actions[actionKey]
         self.world.agent.updateHistory(actionKey) # log the action state before actually taking it
@@ -241,7 +235,7 @@ class QLearner():
             # whats the best action we could take from here?
             if (self.random.random() <= self.randomizeAction):
                 actionKey = self.random.randint(0, len(Actions) - 1)
-            elif (self.EXPERIMENT and (self.timestep > 1000)):
+            elif (self.EXPERIMENT): #and (self.timestep > 1000)):
                 actionVals = Q[x][y][:]
                 bestAction = 0
                 bestValue = -1
@@ -249,7 +243,7 @@ class QLearner():
                     v = actionVals[i] + self.RecencyBonus(x,y,i)
                     if (v > bestValue):
                         bestValue = v
-                        bestValue = i
+                        bestAction = i
                 actionKey = bestAction
             else:
                 actionKey = np.random.choice(np.argwhere(Q[x][y][:] == np.max(Q[x][y][:])).flatten())
@@ -337,9 +331,9 @@ class QLearner():
 
 
 if __name__ == '__main__':
-    experimentCount = 100
+    experimentCount = 5 #100
 
-    iterations = 4000
+    iterations = 6000
     # plotBonusReward(iterations)
 
     
@@ -358,9 +352,9 @@ if __name__ == '__main__':
         dynaQPlus_pa_learner = QLearner(True, True, True)
 
         # learners = [q_learner, dynaQ_learner, dynaQPlus_learner]
-        learners = [dynaQ_learner, dynaQPlus_learner, dynaQPlus_pa_learner]
+        # learners = [dynaQ_learner, dynaQPlus_learner, dynaQPlus_pa_learner]
         # learners = [dynaQ_learner, dynaQPlus_learner]
-        # learners = [dynaQPlus_learner]
+        learners = [dynaQPlus_learner, dynaQPlus_pa_learner]
 
         # hack to detect first win post change
         for i in range(iterations):
@@ -423,10 +417,11 @@ if __name__ == '__main__':
     plt.ylabel("Cumulative Value")
     # plt.plot(x,y2)
     # plt.plot(x,y1,x,y2)
-    plt.plot(x,y1,x,y2,x,y3)
+    plt.plot(x,y2,x,y3)
+    # plt.plot(x,y1,x,y2,x,y3)
     # plt.plot(x,y0,x,y1,x,y2)
     # plt.legend(["DynaQ", "DynaQ+"])
-    plt.legend(["DynaQ", "DynaQ+", "Variant_DynaQ+"])
+    plt.legend(["DynaQ+", "Variant_DynaQ+"])
     plt.show()
 
 
