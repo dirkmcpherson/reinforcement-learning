@@ -1,0 +1,38 @@
+\begin{thebibliography}{1}
+
+\bibitem{griffith_policy_2013}
+Shane Griffith, Kaushik Subramanian, Jonathan Scholz, Charles~L Isbell, and
+  Andrea~L Thomaz.
+\newblock Policy {Shaping}: {Integrating} {Human} {Feedback} with
+  {Reinforcement} {Learning}.
+\newblock In C.~J.~C. Burges, L.~Bottou, M.~Welling, Z.~Ghahramani, and K.~Q.
+  Weinberger, editors, {\em Advances in {Neural} {Information} {Processing}
+  {Systems} 26}, pages 2625--2633. Curran Associates, Inc., 2013.
+
+\bibitem{knox_tamer:_2008}
+W.~Bradley Knox and P.~Stone.
+\newblock {TAMER}: {Training} an {Agent} {Manually} via {Evaluative}
+  {Reinforcement}.
+\newblock In {\em 2008 7th {IEEE} {International} {Conference} on {Development}
+  and {Learning}}, pages 292--297, August 2008.
+
+\bibitem{ng_policy_1999}
+Andrew~Y Ng, Daishi Harada, and Stuart Russell.
+\newblock Policy invariance under reward transformations: {Theory} and
+  application to reward shaping.
+\newblock In {\em {ICML}}, volume~99, pages 278--287, 1999.
+
+\bibitem{pilarski_online_2011}
+P.~M. Pilarski, M.~R. Dawson, T.~Degris, F.~Fahimi, J.~P. Carey, and R.~S.
+  Sutton.
+\newblock Online human training of a myoelectric prosthesis controller via
+  actor-critic reinforcement learning.
+\newblock In {\em 2011 {IEEE} {International} {Conference} on {Rehabilitation}
+  {Robotics}}, pages 1--7, June 2011.
+
+\bibitem{sutton_introduction_1998}
+Richard~S. Sutton and Andrew~G. Barto.
+\newblock {\em Introduction to {Reinforcement} {Learning}}.
+\newblock MIT Press, Cambridge, MA, USA, 1st edition, 1998.
+
+\end{thebibliography}
