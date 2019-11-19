@@ -23,14 +23,15 @@ Robots and Assistive Agents that can learn from caregivers or users are much mor
 
 Taking this one step further, an agent should be able to adjust its behavior in real-time -- fast enough that the user can tell the robot is reacting to their feedback. Unfortunately, user-feedback tends to be sparse and inconsistent. Therefore, it may be helpful to spread the reward from user feedback throughout the tabular value function during planning steps to speed up learning. 
 
+In this paper we will adjust the acceleration profile of an assistive arm's pre-determined feeding trajectory to align with a user's preferences as expressed through their positive or negative feedback. 
 
 % The introduction should describe the problem (in a non-technical manner, i.e., without math, equations, etc.), as well as motivate the problem, i.e., why is it important?
 
 \section{Background Related Work}
 
-The reward signal is a defining aspect of reinforcement learning. An agent repeatedly explores a state-action space, building up a policy as it encounters reward. A trained agent uses its learned policy to take the action that maximized its expected future reward given the current state. Typically the reward is given by the environment, but recent work has focused on incorporating human-feedback into training. 
+In reinforcement learning, an agent repeatedly explores a state-action space, building up a policy as it encounters reward. A trained agent uses its learned policy to take the action that maximized its expected future reward given the current state. The reward signal is a defining aspect of reinforcement learning. Typically the reward is given by the environment, but recent work has focused on incorporating human-feedback into training. 
 
-Researchers are looking at several different methods for incorporating human-feedback. The learning system may treat human-feedback as an additional source of environmental reward in a process known as reward shaping \cite{ng_policy_1999}. In this case when the user gives positive or negative feedback it is simply weighted and summed with the environment reward for the credited transition. This is easy to implement and straightforward, but it doesn't treat human-feedback as anything special. Human-feedback can be considered to contain high-level information about the task, and so there may be some benefit in distinguishing it from environmental reward.
+Researchers have implemented several different methods for incorporating human-feedback. The learning system may treat human-feedback as an additional source of environmental reward in a process known as reward shaping \cite{ng_policy_1999}. In this case when the user gives positive or negative feedback it is simply weighted and summed with the environment reward for the credited transition. This is easy to implement and straightforward, but it doesn't treat human-feedback as anything special. Human-feedback can be considered to contain high-level information about the task, and so there may be some benefit in distinguishing it from environmental reward.
 
 TAMER \cite{knox_tamer:_2008} ignores any environmental reward and uses human-feedback to determine a value function by updating either a table entry (in tabular learning) or a weights vector (in function approximation). This method leads to rapid early learning that can be expanded upon through more human-feedback or other reinforcement learning techniques.
 
@@ -40,26 +41,48 @@ Directly relevant to our use case, Pilarski et al. \cite{pilarski_online_2011} t
 
 All of the above methods use simple binary feedback where the user can approve of, disapprove of, or make no comment on the behavior of the user. 
 
-\section{Technical Approach / Methodology / Theoretical Framework}
+\section{Methodology}
 
 % for proposal
 % Describe how you will approach the problem and its technical formulation. Feel free to re-state the basic RL formulas (e.g., if using Q-learning, state the update rule or the formula for what the Q function approximates). 
 
-We plan to approach this problem using the simplest representation possible, and then scaling up complexity as is required. Initially we'll perform tabular Q-learning ()\ref{eqn:eqn0}) where our reward will be provided through human-feedback by a TAMER-like algorithm. 
-
-We'll use Dyna-Q \cite{sutton_introduction_1998} to speed up the effects of feedback on behavior. Dyna-Q keeps a model of our state-action transitions and simulated $n$ action for each action our agent takes in the real world. This will more rapidly propagate the feedback we get throughout our table and enable a user to see the results of their feedback in real time. Using Dyna-Q may help us clarify whether user-feedback \textit{should} be propagated throughout a table in the way reward is. 
+We plan to approach this problem using the simplest representation possible, and then scaling up complexity as is required. Initially we'll perform tabular Q-learning (eqn. \ref{eqn:eqn0}) where our reward will be provided through human-feedback by a TAMER-like algorithm. We aim to learn the user's preferred acceleration profile for a standardized feeding trajectory. We do this in part to further simplify the task and in part to isolate learning a user's preferences from learning how to perform the task at hand. 
 
 \begin{equation}
     \label{eqn:eqn0}
-    Q(S,A) \leftarrow Q(S,A) + \alpha [R + \gamma \max Q(S',A') - Q(S,A)] 
+    Q(S,A) \leftarrow Q(S,A) + \alpha [Reward + \gamma \max Q(S',A') - Q(S,A)] 
 \end{equation}
+
+One of our primary goals is to learn over a large state-action space quickly enough to show improvement in one session with a single user. We'll use Dyna-Q \cite{sutton_introduction_1998} to speed up the effects of feedback on behavior. Dyna-Q keeps a model of our state-action transitions and simulates $n$ actions for each action our agent takes in the real world. This propagates the feedback we get throughout our table and enables a user to see the results of their feedback more quickly. Using Dyna-Q may help us clarify whether user-feedback \textit{should} be propagated throughout a table in the way reward is. 
+
+\subsection{State Representation}
+
+The state of the arm is represented by the angular positions, velocities, and accelerations of all n-joints. 
+
+$S = {\theta_n V_n A_n}$
+
+Position, velocity, and acceleration will each be discretized to be represented in a tabular form. For each of $n$ joints we will discretize state values with resolutions, $r_\theta$, $r_v$, and $r_a$. Our table will be of dimensions $n*r_\theta*r_v*r_a$, which works out to hundreds of thousands of states\footnote{Assuming course resolutions for velocity and acceleration (tens of values).}. 
+
+Fortunately, a smaller subset of this space will actually be visited by the arms path, which will move between predetermined start and goal positions.
+
+\subsection{Action Representation}
+
+We represent our action as an n-dimensional vector holding the change in acceleration of each of n joints. Acceleration changes by either $+increment$, $-increment$, or $no-change$. 
+
+\subsection{Time Representation}
+
+We use a more course representation of time for learning than ROS does for controlling the arm. This helps us avoid rapid changes in joint accelerations which could damage the arm and would be confusing to a user. Longer time samples also simplifies the problem of crediting feedback to actions, and allows steadier motions to occur which are likely easier for a user to critique. 
+
+\subsection{Feedback Representation}
+
+Initially a user may give a simple \textit{thumbs-up} or \textit{thumbs-down} as is used in comparable research to indicate feedback. If the model works as intended we will expand the feedback to a continuous scale $f \in [-1,1]$, which we hope could lead to more interesting reserach questions and results. 
 
 % for final report
 %A detailed description of your problem (with math, notation, algorithms, figures, etc.). Use footnotes to cite links to your code or videos\footnote{All developed source code for this project is available at ...}
 
-\subsection{Tasks}
+% \subsection{Tasks}
 
-Subsections are useful for breaking down the problem into sub-parts. For example, you could break down the tasks for your project and list them one by one. 
+% Subsections are useful for breaking down the problem into sub-parts. For example, you could break down the tasks for your project and list them one by one. 
 
 % for final report
 %\section{Experimental Results / Technical Demonstration}
@@ -69,7 +92,14 @@ Subsections are useful for breaking down the problem into sub-parts. For example
 % for proposal
 \section{Evaluation}
 
-Describe how you will evaluate your approach/solution. What constitutes success? What metrics will you use? Do you have any preliminary hypothesis that you plan to test? Also, describe the RL domain or environment you plan to use. 
+% Describe how you will evaluate your approach/solution. What constitutes success? What metrics will you use? Do you have any preliminary hypothesis that you plan to test? Also, describe the RL domain or environment you plan to use. 
+
+We evaluated our trained agents based on two criteria: (1) Does the agent learn from a user's feedback quickly enough to exhibit preferred behavior assuming the user has a static preference\footnote{i.e. A stationary policy underlies the user's preference.}, and (2)  Does the user recognize that the agent has altered its behavior in line with their wishes. 
+
+Our first metric was tested using oracles. Oracles have perfect information about the state of the arm and clearly defined consistent preferences for the acceleration profiles for the arms. The oracles gave feedback that guided the agent based on how closely the agents performance matched the oracle's preference. The oracles were configured to give feedback at different rates and consistency to test the robustness of the learning algorithm, and to determine whether it operated quickly enough to be used with human subjects.
+
+Assuming our first metric indicates successful learning, our second metric will be tested with human subjects as part of a complementary Socially Assistive Robotics study. 
+
 
 % for final report
 %\section{Conclusion and Future Work}
@@ -79,31 +109,22 @@ Describe how you will evaluate your approach/solution. What constitutes success?
 
 \section{Timeline and Individual Responsibilities}
 
-State the timeline in terms of weeks and milestones you want to achieve. If working on a team, state what the individual responsibilities are at this point (i.e., who is going to do what, these may of course change over the course of the project). \cite{short2010no}.
+This project was undertaken by one person\footnote{In spite of the frequent use of "we".}, and he is responsible for all deadlines. 
+
+\begin{itemize}
+    \item \textit{Week 1} - Build simplest simulation environment. Single joint arm, Tabular Dyna-Q with fixed rewards. A simple 2D visualization is necessary to debug arm-behavior bugs.  
+    \item \textit{Week 2} - Oracle implementation and feedback. Scaled up arm to 2-3 joints.
+    \item \textit{Week 3} - 7-DOF Arm with Oracle Feedback. Tweak feedback distribution to speed up learning.
+    \item \textit{Week 4} - Non-binary feedback. Integrate with full robot-arm. 
+    \item \textit{Week 5} - Overflow and Catch-Up. Possible user testing. 
+    \item \textit{Week 6} - Write Report.
+\end{itemize}
+
+% State the timeline in terms of weeks and milestones you want to achieve. If working on a team, state what the individual responsibilities are at this point (i.e., who is going to do what, these may of course change over the course of the project). \cite{short2010no}.
 
 \bibliographystyle{plain}
 \bibliography{proposal}
 \end{document}
 
-
-
-% \subsection{State Representation}
-
-% The state of the arm is represented by the angular positions, velocities, and accelerations of all n-joints. 
-
-% $S = {\theta_n V_n A_n}$
-
-% Position, velocity, and acceleration will each be discretized to be represented in a tabular form. For each of $n$ joints we will discretize state values of with resolutions, $r_\theta$, $r_v$, and $r_a$. Our table will be of dimensions $n*r_\theta*r_v*r_a$, which works out to hundreds of thousands of states. 
-
-% \subsection{Action Representation}
-
-% Our action representation is either a change to the acceleration of the end-effector, or a change to the acceleration of each of n joints. Acceleration changes by either $+increment$, $-increment$, or $no-change$. 
-
-% \subsection{Time Representation}
-% We use a more course representation of time for learning than ROS does for controlling the arm. Our . 
-
-% \subsection{Feedback Representation}
-
-% Since our action definition is a change to the acceleration of a joint, its likely that the human feedback is due to an earlier action-
 
 
