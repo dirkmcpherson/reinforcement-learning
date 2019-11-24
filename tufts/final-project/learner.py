@@ -74,14 +74,24 @@ class DynaQLearner(object):
     def getTiledStateHash(self, tiledState):
         h = ""
         for entry in tiledState:
-            h += entry + "-"
+            h += str(entry) + "-"
         return h
 
     def update(self, s, a_idx, s_prime, r):
         h_s = self.getTiledStateHash(self.getTile(s))
         h_s_prime = self.getTiledStateHash(self.getTile(s_prime))
-        self.Q[h_s][a_idx] = self.Q[h_s][a_idx] + 0.8 * (r + 0.5 * np.max(self.Q[h_s_prime]) - self.Q[h_s][a_idx])
+
+        if (h_s not in self.Q):
+            self.Q[h_s] = action.blankActionValueSet()
+
+        if (h_s_prime not in self.Q):
+            self.Q[h_s_prime] = action.blankActionValueSet()
+
+        self.Q[h_s][a_idx] = self.Q[h_s][a_idx] + 0.8 * (r + 0.5 * np.max(list(self.Q[h_s_prime].values())) - self.Q[h_s][a_idx])
         
+    def acceptFeedback(self, state):
+        pass
+
     def sampleAction(self, state):
         actionIdx = None
         if (random.random() > 0.9):

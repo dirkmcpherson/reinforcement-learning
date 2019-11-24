@@ -52,26 +52,32 @@ class ArmEnv(object):
             self.on_goal = 0
 
         # state
-        s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
+        #s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
+        s = (self.arm_info['r'][0], self.arm_info['r'][1], 0, 0, 0, 0)
         return s, r, done
 
-    def reset(self):
-        self.goal['x'] = np.random.rand()*400.
-        self.goal['y'] = np.random.rand()*400.
-        self.arm_info['r'] = 2 * np.pi * np.random.rand(2)
-        self.on_goal = 0
-        (a1l, a2l) = self.arm_info['l']  # radius, arm length
-        (a1r, a2r) = self.arm_info['r']  # radian, angle
-        a1xy = np.array([200., 200.])  # a1 start (x0, y0)
-        a1xy_ = np.array([np.cos(a1r), np.sin(a1r)]) * a1l + a1xy  # a1 end and a2 start (x1, y1)
-        finger = np.array([np.cos(a1r + a2r), np.sin(a1r + a2r)]) * a2l + a1xy_  # a2 end (x2, y2)
-        # normalize features
-        dist1 = [(self.goal['x'] - a1xy_[0])/400, (self.goal['y'] - a1xy_[1])/400]
-        dist2 = [(self.goal['x'] - finger[0])/400, (self.goal['y'] - finger[1])/400]
-        # state
-        s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
-        return s
+    # def reset(self):
+    #     self.goal['x'] = np.random.rand()*400.
+    #     self.goal['y'] = np.random.rand()*400.
+    #     self.arm_info['r'] = 2 * np.pi * np.random.rand(2)
+    #     self.on_goal = 0
+    #     (a1l, a2l) = self.arm_info['l']  # radius, arm length
+    #     (a1r, a2r) = self.arm_info['r']  # radian, angle
+    #     a1xy = np.array([200., 200.])  # a1 start (x0, y0)
+    #     a1xy_ = np.array([np.cos(a1r), np.sin(a1r)]) * a1l + a1xy  # a1 end and a2 start (x1, y1)
+    #     finger = np.array([np.cos(a1r + a2r), np.sin(a1r + a2r)]) * a2l + a1xy_  # a2 end (x2, y2)
+    #     # normalize features
+    #     dist1 = [(self.goal['x'] - a1xy_[0])/400, (self.goal['y'] - a1xy_[1])/400]
+    #     dist2 = [(self.goal['x'] - finger[0])/400, (self.goal['y'] - finger[1])/400]
+    #     # state
+    #     s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
+    #     return s
 
+    def reset(self):
+        self.goal['x'] = 50
+        self.goal['y'] = 50
+        self.arm_info['r'] np.array([np.pi / 4, np.pi / 4.])
+    
     def render(self):
         if self.viewer is None:
             self.viewer = Viewer(self.arm_info, self.goal)

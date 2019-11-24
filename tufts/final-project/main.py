@@ -12,7 +12,7 @@ def reset():
 
 
 if __name__ == '__main__':
-    numEpisodes = 10
+    numEpisodes = 100
 
     arm = env.ArmEnv()
     o = subjective.Subjective(arm)
