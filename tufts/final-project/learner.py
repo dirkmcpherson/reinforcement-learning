@@ -4,40 +4,8 @@ from feedback import Valence
 import tile_coding as tc
 import random
 import action
+import util
 from IPython import embed
-
-# class Learner:
-#     def __init__(self):
-#         self.actionMap = {"rotateLeft": 1., "rotateRight" : -1.}
-#         self.actionValues = {}
-#         for k,v in self.actionMap.items():
-#             self.actionValues[k] = 0.
-
-#         self.lastAction = None
-
-
-#     def acceptFeedback(self, fb):
-#         increment = 0
-#         if (fb.valence == Valence.POSITIVE):
-#             increment = 0.01
-#         elif (fb.valence == Valence.NEGATIVE):
-#             increment = -0.01
-        
-#         if (self.lastAction):
-#             self.actionValues[self.lastAction] += increment
-
-#     def sampleAction(self):
-#         maxVal = -1
-#         bestAction = None
-#         for k,v in self.actionValues.items():
-#             if (v > maxVal):
-#                 bestAction = k
-#                 maxVal = v
-
-#         print("Action values {}".format(str(self.actionValues)))
-#         # print("Best action {}".format(bestAction))
-#         self.lastAction = bestAction
-#         return np.array([self.actionMap[self.lastAction], 0])
 
 class DynaQLearner(object):
     def __init__(self):
@@ -87,7 +55,7 @@ class DynaQLearner(object):
         if (h_s_prime not in self.Q):
             self.Q[h_s_prime] = action.blankActionValueSet()
 
-        self.Q[h_s][a_idx] = self.Q[h_s][a_idx] + 0.8 * (r + 0.5 * np.max(list(self.Q[h_s_prime].values())) - self.Q[h_s][a_idx])
+        self.Q[h_s][a_idx] = self.Q[h_s][a_idx] + 0.8 * (r + 0.5 * np.max(self.Q[h_s_prime]) - self.Q[h_s][a_idx])
         
     def acceptFeedback(self, state):
         pass
@@ -96,15 +64,16 @@ class DynaQLearner(object):
         actionIdx = None
         if (random.random() > 0.9):
             # Select random action
-            actionIdx = random.randint(0, (len(self.actionSet) - 1))
+            actionIdx = action.getRandomActionIdx()
         else:
             state_tiled = self.getTile(state)
             state_tiled_hash = self.getTiledStateHash(state_tiled)
             if state_tiled_hash in self.Q:
-                actionIdx = np.argmax(self.Q[state_tiled_hash])
+                actionIdx = util.randomArgMax(self.Q[state_tiled_hash])
+                # embed()
             else:
                 self.Q[state_tiled_hash] = action.blankActionValueSet()
-                actionIdx = random.randint(0, (len(self.actionSet) - 1))
+                actionIdx = action.getRandomActionIdx()
 
             
         return actionIdx

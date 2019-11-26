@@ -2,6 +2,7 @@
 
 import numpy as np
 import pyglet
+from IPython import embed
 
 
 class ArmEnv(object):
@@ -17,10 +18,13 @@ class ArmEnv(object):
             2, dtype=[('l', np.float32), ('r', np.float32)])
         self.arm_info['l'] = 100        # 2 arms length
         self.arm_info['r'] = np.pi/6    # 2 angles information
+        self.arm_info['v'] = 0
+        self.arm_info['a'] = 0
         self.on_goal = 0
 
         # jss
         self.momentum = np.zeros(2)
+        self.reset()
 
     def step(self, action):
         #hack
@@ -28,6 +32,7 @@ class ArmEnv(object):
 
         done = False
         action = np.clip(action, *self.action_bound)
+        embed()
         self.arm_info['r'] += action * self.dt
         self.arm_info['r'] %= np.pi * 2    # normalize
 
@@ -46,13 +51,15 @@ class ArmEnv(object):
             if self.goal['y'] - self.goal['l']/2 < finger[1] < self.goal['y'] + self.goal['l']/2:
                 r += 1.
                 self.on_goal += 1
-                if self.on_goal > 50:
+                if self.on_goal > 20:
                     done = True
         else:
+            # print("Self on goal got to " + str(self.on_goal))
             self.on_goal = 0
 
         # state
         #s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
+        # State is angle of first joint, angle of second joint, velocity of first and second, acceleration of first and second
         s = (self.arm_info['r'][0], self.arm_info['r'][1], 0, 0, 0, 0)
         return s, r, done
 
@@ -74,9 +81,9 @@ class ArmEnv(object):
     #     return s
 
     def reset(self):
-        self.goal['x'] = 50
-        self.goal['y'] = 50
-        self.arm_info['r'] np.array([np.pi / 4, np.pi / 4.])
+        self.goal['x'] = 60
+        self.goal['y'] = 60
+        self.arm_info['r'] = np.array([np.pi / 4, 0])
     
     def render(self):
         if self.viewer is None:
@@ -168,8 +175,9 @@ class Viewer(pyglet.window.Window):
 
     # convert the mouse coordinate to goal's coordinate
     def on_mouse_motion(self, x, y, dx, dy):
-        self.goal_info['x'] = x
-        self.goal_info['y'] = y
+        pass
+        # self.goal_info['x'] = x
+        # self.goal_info['y'] = y
 
 
 if __name__ == '__main__':
