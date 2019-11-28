@@ -53,7 +53,7 @@ class Subjective:
         # elif (r > 0.9):
         #     fb = FeedbackType.POSITIVE
         
-        if (environment.momentum[0] > 0):
+        if (environment.momentum[0] < 0):
             fb = Valence.POSITIVE
         else:
             fb = Valence.NEGATIVE

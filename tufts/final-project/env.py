@@ -8,14 +8,16 @@ from IPython import embed
 class ArmEnv(object):
     viewer = None
     dt = .1    # refresh rate
-    action_bound = [-1, 1]
+    action_bound = [-0.25, 0.25]
+    acceleration_bound = [-0.25, 0.25]
+    velocity_bound = [-.3, .3]
     goal = {'x': 100., 'y': 100., 'l': 40}
     state_dim = 9
     action_dim = 2
 
     def __init__(self):
         self.arm_info = np.zeros(
-            2, dtype=[('l', np.float32), ('r', np.float32)])
+            2, dtype=[('l', np.float32), ('r', np.float32), ('v', np.float32), ('a', np.float32)])
         self.arm_info['l'] = 100        # 2 arms length
         self.arm_info['r'] = np.pi/6    # 2 angles information
         self.arm_info['v'] = 0
@@ -26,15 +28,24 @@ class ArmEnv(object):
         self.momentum = np.zeros(2)
         self.reset()
 
+    def printState(self):
+        print("s_a = ", self.get_state())
+
     def step(self, action):
         #hack
         self.momentum = action
 
         done = False
         action = np.clip(action, *self.action_bound)
-        embed()
-        self.arm_info['r'] += action * self.dt
+        # self.arm_info['a'] += action * self.dt
+        # self.arm_info['a'] = np.clip(self.arm_info['a'], *self.acceleration_bound)
+        # self.arm_info['v'] += self.arm_info['a'] * self.dt
+        # self.arm_info['v'] = np.clip(self.arm_info['v'], *self.velocity_bound)
+        # self.arm_info['r'] += self.arm_info['v'] * self.dt
+        self.arm_info['r'] += action * self.dt    # normalize
         self.arm_info['r'] %= np.pi * 2    # normalize
+
+        # self.momentum = [10*self.arm_info['v'][0], self.arm_info['v'][1]]
 
         (a1l, a2l) = self.arm_info['l']  # radius, arm length
         (a1r, a2r) = self.arm_info['r']  # radian, angle
@@ -45,13 +56,15 @@ class ArmEnv(object):
         dist1 = [(self.goal['x'] - a1xy_[0]) / 400, (self.goal['y'] - a1xy_[1]) / 400]
         dist2 = [(self.goal['x'] - finger[0]) / 400, (self.goal['y'] - finger[1]) / 400]
         r = -np.sqrt(dist2[0]**2+dist2[1]**2)
+        # r = 0
 
         # done and reward
         if self.goal['x'] - self.goal['l']/2 < finger[0] < self.goal['x'] + self.goal['l']/2:
             if self.goal['y'] - self.goal['l']/2 < finger[1] < self.goal['y'] + self.goal['l']/2:
                 r += 1.
                 self.on_goal += 1
-                if self.on_goal > 20:
+                if self.on_goal > 10:
+                    r += 10
                     done = True
         else:
             # print("Self on goal got to " + str(self.on_goal))
@@ -60,7 +73,7 @@ class ArmEnv(object):
         # state
         #s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
         # State is angle of first joint, angle of second joint, velocity of first and second, acceleration of first and second
-        s = (self.arm_info['r'][0], self.arm_info['r'][1], 0, 0, 0, 0)
+        s = self.get_state()
         return s, r, done
 
     # def reset(self):
@@ -94,10 +107,8 @@ class ArmEnv(object):
         return np.random.rand(2)-0.5    # two radians
 
     def get_state(self):
-        pos = self.arm_info['r'] # position
-        vel = (0,0)
-        acc = (0,0)
-        return (pos[0], pos[1], vel[0], vel[1], acc[0], acc[1])
+        return (self.arm_info['r'][0], self.arm_info['r'][1])
+        # return (*self.arm_info['r'], *self.arm_info['v'], *self.arm_info['a'])
 
 
 class Viewer(pyglet.window.Window):
