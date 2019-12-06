@@ -8,6 +8,8 @@ import util
 from IPython import embed
 import time
 
+pathForTable = "./q_values"
+pathForModel = "./model"
 class DynaQLearner(object):
     def __init__(self):
         self.actionSet = action.ActionSet
@@ -41,6 +43,7 @@ class DynaQLearner(object):
         # Currently a full Q array is ~2.4gb
         self.Q = self.setupQ(maxVal)
         self.model = self.setupModel(maxVal)
+        self.visitedStates = set()
         # embed()
 
     def setupQ(self, maxVal):
@@ -49,11 +52,12 @@ class DynaQLearner(object):
         Q = np.zeros(entries)
         return Q
     
+    # In order to space, we're going to store (s,a,r) rather than (s,a,s',r) since we dont actually have to use s'
     def setupModel(self, maxVal):
         # same setup as Q, but instead of the action setup its a list thats [numTilings, reward]
         entries = [maxVal for i in range(self.numTilings)]
         entries.append(len(action.ActionSet)) # the number of actions we can take
-        entries.append(self.numTilings + 1) # +1 for reward
+        entries.append(1) # +1 for reward. We're ignoring S'
         model = np.zeros(entries)
         return model
 
@@ -74,7 +78,7 @@ class DynaQLearner(object):
     def tileRepresentation(self, state):
         return self.getTile(state)
 
-    def update(self, s, a_idx, s_prime, r):
+    def update(self, s, a_idx, s_prime, r, updateModel = False):
         s_tile = self.getTile(s)
         s_prime_tile = self.getTile(s_prime)
 
@@ -86,11 +90,13 @@ class DynaQLearner(object):
 
         self.Q[tuple(entry)] = q0 + self.alpha * (r + self.gamma * q1 - q0)
 
-        # embed()
-        modelEntry = s_prime_tile
-        modelEntry.append(r)
-        self.model[s_a_entry] = modelEntry
-        # embed()
+
+        if updateModel:
+            self.model[s_a_entry] = r
+            # print("Updated {} from {} to {}".format(entry, q0, self.Q[tuple(entry)]))
+        else:
+            # print("Updated value from {} to {}".format(q0, self.Q[tuple(entry)]))
+            pass
         
         # Saved for hashing tiles
         # h_s = self.getTiledStateHash(self.getTile(s))
@@ -134,22 +140,37 @@ class DynaQLearner(object):
             #     actionIdx = action.getRandomActionIdx()
 
         # print("sampled action ", actionIdx)
+        if (state not in self.visitedStates):
+            self.visitedStates.add(state)
+
         return actionIdx
 
-    def modelUpdate(self):
+    def modelUpdate(self, env):
         for i in range(self.dynaQUpdates):
-            # embed()
-            start_state_tiling_hash = random.choice(list(self.Q.keys()))
-            if (not start_state_tiling_hash in self.TilingToState):
-                embed()
 
-            start_state = list(self.TilingToState[start_state_tiling_hash])
+            # s = np.array(env.get_random_state())
+            s = list(random.sample(self.visitedStates, 1)[0])
+            # print("sampled ", s)
+
             actionIdx = action.getRandomActionIdx()
-
             a = action.ActionSet[actionIdx]
 
-            dt = 0.1
-            s_prime = [start_state[i] + (a[i] * dt) for i in range(len(start_state))]
+            s_prime = env.update_state_from_action(s, a)
+
+            # Grab the reward from our model of the environment
+            s_tile = self.getTile(s)
+            entry = s_tile
+            entry.append(actionIdx)
+            s_a_entry = tuple(entry)
+            r = self.model[s_a_entry]
+
+            # embed()
+            # start_state_tiling_hash = random.choice(list(self.Q.keys()))
+            # if (not start_state_tiling_hash in self.TilingToState):
+            #     embed()
+
+            # start_state = list(self.TilingToState[start_state_tiling_hash])
+            # actionIdx = action.getRandomActionIdx()
 
             # # update accelerations
             # s_prime[4] += a[0] * dt
@@ -163,29 +184,44 @@ class DynaQLearner(object):
             # s_prime[0] += s_prime[2] * dt
             # s_prime[1] += s_prime[3] * dt
 
-            self.update(start_state, actionIdx, s_prime, self.StateReward[start_state_tiling_hash][actionIdx])
+            self.update(s, actionIdx, s_prime, r)
 
+    def save(self):
+        np.save(pathForTable, self.Q)
+        np.save(pathForModel, self.model)
 
+    def load(self):
+        self.Q = np.load(pathForTable + ".npy")
+        self.model = np.load(pathForModel + ".npy")
 
     
 
 
 
 if __name__ == '__main__':
-    DynaQLearner()
+    dql = DynaQLearner()
+    t0 = time.time()
+    dql.save()
+    print("Took {} to save.".format(time.time() - t0))
+    t0 = time.time()
+    dql.load()
+    print("Took {} to load.".format(time.time() - t0))
+
+
+
 
     # Make the hash handler
-    random.seed(0)
-    iht = tc.IHT(1024)
-    numTilings = 8
-    vals = [0,0,0,0,0,0]
-    (p0, p1, v0, v1, a0, a1) = vals
-    for i in range(1000):
-        vals[0] += random.random() * 2 * np.pi
-        vals[1] += random.random() * 2 * np.pi
-        vals[2] += random.random() * 2
-        vals[3] += random.random() * 2
-        vals[4] += random.random() * 0.5
-        vals[5] += random.random() * 0.5
+    # random.seed(0)
+    # iht = tc.IHT(1024)
+    # numTilings = 8
+    # vals = [0,0,0,0,0,0]
+    # (p0, p1, v0, v1, a0, a1) = vals
+    # for i in range(1000):
+    #     vals[0] += random.random() * 2 * np.pi
+    #     vals[1] += random.random() * 2 * np.pi
+    #     vals[2] += random.random() * 2
+    #     vals[3] += random.random() * 2
+    #     vals[4] += random.random() * 0.5
+    #     vals[5] += random.random() * 0.5
 
-        print(tc.tiles(iht, numTilings, vals))
+    #     print(tc.tiles(iht, numTilings, vals))

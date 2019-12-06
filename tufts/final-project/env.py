@@ -3,12 +3,14 @@
 import numpy as np
 import pyglet
 from IPython import embed
+import random
 
 
 class ArmEnv(object):
     viewer = None
     dt = .1    # refresh rate
-    action_bound = [-0.25, 0.25]
+    action_bound = [-1, 1]
+    # action_bound = [-0.25, 0.25]
     acceleration_bound = [-0.25, 0.25]
     velocity_bound = [-.3, .3]
     goal = {'x': 100., 'y': 100., 'l': 40}
@@ -42,8 +44,9 @@ class ArmEnv(object):
         # self.arm_info['v'] += self.arm_info['a'] * self.dt
         # self.arm_info['v'] = np.clip(self.arm_info['v'], *self.velocity_bound)
         # self.arm_info['r'] += self.arm_info['v'] * self.dt
-        self.arm_info['r'] += action * self.dt    # normalize
-        self.arm_info['r'] %= np.pi * 2    # normalize
+        # self.arm_info['r'] += action * self.dt    # normalize
+        # self.arm_info['r'] %= np.pi * 2    # normalize
+        self.arm_info['r'] = self.update_state_from_action(self.arm_info['r'], action)
 
         # self.momentum = [10*self.arm_info['v'][0], self.arm_info['v'][1]]
 
@@ -55,8 +58,8 @@ class ArmEnv(object):
         # normalize features
         dist1 = [(self.goal['x'] - a1xy_[0]) / 400, (self.goal['y'] - a1xy_[1]) / 400]
         dist2 = [(self.goal['x'] - finger[0]) / 400, (self.goal['y'] - finger[1]) / 400]
-        r = -np.sqrt(dist2[0]**2+dist2[1]**2)
-        # r = 0
+        # r = -np.sqrt(dist2[0]**2+dist2[1]**2)
+        r = 0
 
         # done and reward
         if self.goal['x'] - self.goal['l']/2 < finger[0] < self.goal['x'] + self.goal['l']/2:
@@ -106,10 +109,21 @@ class ArmEnv(object):
     def sample_action(self):
         return np.random.rand(2)-0.5    # two radians
 
+    def update_state_from_action(self, s, a):
+        s = [s[i] + a[i] * self.dt for i in range(len(a))]
+        # print("{} += {} * {}".format(s,a,self.dt))
+        s = [entry%(np.pi * 2.) for entry in s]
+        # print("{}".format(s))
+        return s
+        # return [(s[i] + (a[i] * self.dt)) % 2*np.pi for i in range(len(a))]
+
     def get_state(self):
-        return (self.arm_info['r'][0], self.arm_info['r'][1])
+        return (round(self.arm_info['r'][0],2), round(self.arm_info['r'][1],2))
         # return (*self.arm_info['r'], *self.arm_info['v'], *self.arm_info['a'])
 
+    # Get a random legal state in the environment
+    def get_random_state(self):
+        return [round(random.random() * 2. * np.pi,2), round(random.random() * 2. * np.pi,2)]
 
 class Viewer(pyglet.window.Window):
     bar_thc = 5
