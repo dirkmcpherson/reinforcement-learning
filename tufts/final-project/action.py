@@ -1,6 +1,7 @@
 import random
+import numpy as np
 
-increment = 5
+increment = round(10 * np.pi / 2.,2)
 ActionSet = {
             # 0: [-0.1, 0],
             # 1: [0.1, 0]

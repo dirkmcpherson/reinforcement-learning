@@ -11,12 +11,24 @@ import matplotlib.pyplot as plt
 import time
 import sys
 
+DEBUG = True
 
 def main():
     pass
 
 def reset(arm):
     arm.reset()
+
+def inputAndEmbed():
+    char = input("Enter input...")
+    if (char == 'e'):
+        embed()
+
+def printNonzeroEntries(l):
+    for i in range (l.Q.shape[0]):
+        vals = l.Q[i]
+        if (np.sum(vals) > 0):
+            print(""+str(i)+" "+str(vals))
 
 
 if __name__ == '__main__':
@@ -38,12 +50,15 @@ if __name__ == '__main__':
 
     dynaQ = True
     descriptionString = "dynaQ" if dynaQ else "basic"
-    numExperiments = 5
+    numExperiments = 10
     allEpisodes = []
+    TotalRunEpisodes = 50
     for i in range(numExperiments):
         plt.figure(i)
-        numEpisodes = 100
-        action_resolution = 1 # how many timesteps between updates?
+
+        # TotalRunEpisodes = TotalRunEpisodes * (2 ** i)
+        numEpisodes = TotalRunEpisodes
+
         step_count = 0
 
         arm = env.ArmEnv()
@@ -63,31 +78,19 @@ if __name__ == '__main__':
         while(True):
             startTime = time.time()
             arm.render() # render the arm visually
-            # print("time0 ", time.time() - startTime)
 
-            TakeStep = (step_count % action_resolution) == 0
-            if TakeStep:
-                state = arm.get_state()
-                actionIdx = l.sampleAction(state)
-
-                # actionIdx = max(0, min(2, int(input("enter action idx"))))
-
-                indexCount[actionIdx] += 1
-            # print("time1 ", time.time() - startTime)
+            state = arm.get_state()
+            actionIdx = l.sampleAction(state)
+            indexCount[actionIdx] += 1
 
             newState, reward, goalAchieved = arm.step(action.ActionSet[actionIdx]) # select an action based on the current policy
-            # print("newState ", newState)
-            # print("reward ", reward)
-            # allRewards.append(reward)
-            # print("time2 ", time.time() - startTime)
 
-            if (goalAchieved or TakeStep):
-                l.update(state, actionIdx, newState, reward, updateModel=True)
-                # print("time2 ", time.time())
+            l.update(state, actionIdx, newState, reward, updateModel=True)
 
-            # print("time3 ", time.time() - startTime)
-            # if (step_count > 1 and step_count % 1000 == 0):
-            #     embed()
+            if (DEBUG and numEpisodes <= np.floor(TotalRunEpisodes/2.)):
+                print("--s:{} a{} sp:{}--".format(state, actionIdx, newState))
+                printNonzeroEntries(l)
+                inputAndEmbed()
 
             # feedback = o.evaluateEnvironment(arm) # Oracle observes the environment so check if it has feedback
             # if feedback:
@@ -98,6 +101,7 @@ if __name__ == '__main__':
                 if not AchievedGoal:
                     print("First goal achieved.")
                     AchievedGoal = True
+                print("Achieved goal at {}".format(newState))
                 reset(arm)
                 allSteps.append(stepstogoal)
                 # print("Episode complete. ", stepstogoal)
@@ -107,9 +111,14 @@ if __name__ == '__main__':
                 numEpisodes -= 1
                 if (numEpisodes <= 0):
                     break
+                # elif (numEpisodes == np.floor(TotalRunEpisodes/2.)):
+                #     embed()
             elif (AchievedGoal): # dont care about updates until we have some reward to propagate
                 if (dynaQ):
                     l.modelUpdate(arm)
+                    if (DEBUG and numEpisodes <= np.floor(TotalRunEpisodes/2.)):
+                        printNonzeroEntries(l)
+                        inputAndEmbed()
                 else:
                     pass
 
@@ -124,6 +133,21 @@ if __name__ == '__main__':
             stepstogoal += 1
             # print("duration: ", time.time() - startTime)
 
+        print("normfirst {}".format(l.normFirst))
+        print("dynafirst {}".format(l.dynaFirst))
+
+        plt.figure()
+        x = [i for i in range(630)]
+        y = []
+        for key in x:
+            if key in l.visitedStatesModelCount.keys():
+                y.append(l.visitedStatesModelCount[key])
+            else:
+                y.append(0)
+
+        plt.bar(x,y)
+        plt.savefig("visitedStatesModelCount-{}-{}".format(descriptionString,i))
+
         allEpisodes.append(allSteps)
         print("All data:")
         for entry in allSteps:
@@ -134,6 +158,21 @@ if __name__ == '__main__':
         plt.plot(allSteps)
         plt.savefig("experiment-{}-{}".format(descriptionString,i))
 
+        # plot normalized polar to see how we're learning
+        theta = [i*.01 for i in range(len(l.Q))]
+        r = [sum(entries) for entries in l.Q]
+        r /= np.max(r)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='polar')
+        c = ax.scatter(theta, r, cmap='hsv', alpha=0.75)
+        plt.savefig("polarplot{}-exp{}-{}".format(descriptionString,i,numEpisodes))
+        # embed()
+
+        fig = plt.figure()
+        plt.bar(theta, r, linewidth=0.1, edgecolor="black")
+        plt.savefig("barplot{}-exp{}-{}".format(descriptionString,i,numEpisodes))
+
     allMeans = np.mean([np.mean(entry) for entry in allEpisodes])
     print("allMeans: ", allMeans)
 
@@ -142,7 +181,7 @@ if __name__ == '__main__':
         total = [entry[i] for entry in allEpisodes]
         episodicMean.append(np.mean(total))
 
-    plt.figure(9)
+    plt.figure()
     plt.plot(episodicMean)
     plt.savefig("episodicMean-{}-{}".format(descriptionString, i))
 

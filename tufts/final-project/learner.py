@@ -10,18 +10,19 @@ import time
 
 pathForTable = "./q_values"
 pathForModel = "./model"
+
 class DynaQLearner(object):
     def __init__(self):
         self.actionSet = action.ActionSet
 
-        self.dynaQUpdates = 20
+        self.dynaQUpdates = 1
 
-        self.alpha = 0.5 # learning rate
-        self.gamma = 0.8 # future discount
+        self.alpha = 1 #0.5 # learning rate
+        self.gamma = 0.9 # future discount
 
         # Set up the tiling based on a standard random seed
         random.seed()
-        self.numTilings = 4 #8
+        self.numTilings = 1 #8
         self.numDimensions = 2#6
         maxVal = 100
         vals = [0 for i in range(self.numDimensions)]
@@ -43,11 +44,20 @@ class DynaQLearner(object):
         # Currently a full Q array is ~2.4gb
         self.Q = self.setupQ(maxVal)
         self.model = self.setupModel(maxVal)
-        self.visitedStates = set()
-        # embed()
+        # self.visitedStates = set()
+        self.visitedStates = dict()
+        self.visitedStatesCount = dict()
+        self.visitedStatesModelCount = dict()
+
+        self.normFirst = 0
+        self.dynaFirst = 0
 
     def setupQ(self, maxVal):
-        entries = [maxVal for i in range(self.numTilings)]
+        # entries = [maxVal for i in range(self.numTilings)]
+        # entries.append(len(action.ActionSet))
+        # Q = np.zeros(entries)
+        resolution = int(np.ceil( round((2*np.pi) * 100,2) ))
+        entries = [resolution]
         entries.append(len(action.ActionSet))
         Q = np.zeros(entries)
         return Q
@@ -55,9 +65,13 @@ class DynaQLearner(object):
     # In order to space, we're going to store (s,a,r) rather than (s,a,s',r) since we dont actually have to use s'
     def setupModel(self, maxVal):
         # same setup as Q, but instead of the action setup its a list thats [numTilings, reward]
-        entries = [maxVal for i in range(self.numTilings)]
-        entries.append(len(action.ActionSet)) # the number of actions we can take
-        entries.append(1) # +1 for reward. We're ignoring S'
+        # entries = [maxVal for i in range(self.numTilings)]
+        # entries.append(len(action.ActionSet)) # the number of actions we can take
+        # entries.append(1) # +1 for reward. We're ignoring S'
+        resolution = int(np.ceil( (2*np.pi) / 0.01 ))
+        entries = [resolution]
+        entries.append(len(action.ActionSet))
+        entries.append(1) # 1 for reward
         model = np.zeros(entries)
         return model
 
@@ -76,26 +90,58 @@ class DynaQLearner(object):
 
     # Wrapper to get the tile representation of a state
     def tileRepresentation(self, state):
-        return self.getTile(state)
+        return util.angleToState(round(state[0], 2))
+        # return self.getTile(state)
 
     def update(self, s, a_idx, s_prime, r, updateModel = False):
-        s_tile = self.getTile(s)
-        s_prime_tile = self.getTile(s_prime)
+        # s_tile = self.getTile(s)
+        # s_prime_tile = self.getTile(s_prime)
+        #ugly hack
+        if not updateModel:
+            s_tile = s[:1]
+            # embed()
+            entry = s_tile
+            # print("MODEL {} took action {} to {} for reward {}".format(s_tile,a_idx,s_prime,r))
+        else:
+            s_tile = [self.tileRepresentation(s)]
+            entry = s_tile
+            # print("{} took action {} to {} for reward {}".format(s_tile,a_idx,s_prime,r))
 
-        entry = s_tile
+        s_prime_tile = self.tileRepresentation(s_prime)
+
         entry.append(a_idx)
         s_a_entry = tuple(entry)
+
+        # if not updateModel:
+        #     embed()
+
         q0 = self.Q[s_a_entry]
-        q1 = np.max(self.Q[tuple(s_prime_tile)])
+        # q1 = np.max(self.Q[tuple(s_prime_tile)])
+        q1 = np.max(self.Q[s_prime_tile])
+        # Cap the final value because right now it can just accumulate forever (there are several terminal states and termination requires resting on them, so we can't just end as soon as we reach the square)
+        
+        updated = q0 + self.alpha * (r + self.gamma * q1 - q0)
+        # if (updated > 10):
+            # embed()
+        updated = min(10., updated)
+        self.Q[s_a_entry] = updated
+        dv = self.Q[s_a_entry] - q0
 
-        self.Q[tuple(entry)] = q0 + self.alpha * (r + self.gamma * q1 - q0)
 
 
+        # print("{} {} to {} for reward {} and to update {} by {} final value {}".format(("" if updateModel else "MODEL"),s_a_entry,s_prime,r,q0,dv,self.Q[s_a_entry]))
+        # print("     q0:{} q1:{} r:{}".format(q0,q1,r))
         if updateModel:
             self.model[s_a_entry] = r
-            # print("Updated {} from {} to {}".format(entry, q0, self.Q[tuple(entry)]))
+            # print("value updated state {} by {}".format(s_a_entry, dv))
+            if (q0 == 0 and self.Q[s_a_entry] > 0):
+                # embed()
+                # print("first value updated state {} by {}".format(s_a_entry, dv))
+                self.normFirst += 1
         else:
-            # print("Updated value from {} to {}".format(q0, self.Q[tuple(entry)]))
+            if (q0 == 0 and self.Q[s_a_entry] > 0):
+                # print("MODEL first value updated state {} by {}".format(s_a_entry, dv))
+                self.dynaFirst += 1
             pass
         
         # Saved for hashing tiles
@@ -121,50 +167,63 @@ class DynaQLearner(object):
 
     def sampleAction(self, state):
         actionIdx = None
+        tile = self.tileRepresentation(state)
         if (random.random() > 0.9):
             # Select random action
             actionIdx = action.getRandomActionIdx()
         else:
-            tile = self.tileRepresentation(state)
-            # embed()
-            actionIdx = util.randomArgMax(self.Q[tuple(tile)])
-            # state_tiled = self.getTile(state)
-            # state_tiled_hash = self.getTiledStateHash(state_tiled)
-            # if state_tiled_hash in self.Q:
-            #     actionIdx = util.randomArgMax(self.Q[state_tiled_hash])
-                # embed()
-            # else:
-            #     self.Q[state_tiled_hash] = action.blankActionValueSet()
-            #     self.TilingToState[state_tiled_hash] = state
-            #     self.StateReward[state_tiled_hash] = action.blankActionValueSet()
-            #     actionIdx = action.getRandomActionIdx()
+            actionIdx = util.randomArgMax(self.Q[tile])
+            # actionIdx = util.randomArgMax(self.Q[tuple(tile)])
 
+        # print(tile)
         # print("sampled action ", actionIdx)
-        if (state not in self.visitedStates):
-            self.visitedStates.add(state)
+        # if (state not in self.visitedStates):
+        if (tile not in self.visitedStates):
+            # self.visitedStates.add(state)
+            self.visitedStates[tile] = [actionIdx]
+            self.visitedStatesCount[tile] = 0
+        else:
+            # embed()
+            if actionIdx not in self.visitedStates[tile]:
+                self.visitedStates[tile].append(actionIdx)
+
+            self.visitedStatesCount[tile] += 1
+
 
         return actionIdx
 
     def modelUpdate(self, env):
         for i in range(self.dynaQUpdates):
-
             # s = np.array(env.get_random_state())
-            s = list(random.sample(self.visitedStates, 1)[0])
-            # print("sampled ", s)
+            # s = list(random.sample(self.visitedStates, 1)[0])
+            s = [random.choice(list(self.visitedStates.keys())), 0]
+            # embed()
+            # for i in range(1000000):
+            #     x = 0
+            #     pass
+            blah = s[0]
+            if (blah in self.visitedStatesModelCount):
+                self.visitedStatesModelCount[blah] += 1
+            else:
+                self.visitedStatesModelCount[blah] = 0
+            actionIdx = random.choice(self.visitedStates[s[0]])
 
-            actionIdx = action.getRandomActionIdx()
+
             a = action.ActionSet[actionIdx]
 
-            s_prime = env.update_state_from_action(s, a)
+            # s_prime = env.update_state_from_action(s, a)
+            s_prime = env.update_state_from_action([entry*0.01 for entry in s], a)
+            # print("{} + {} for {}".format(s, a, s_prime))
 
+            print("--model s{}  a{}  sp{}--".format(s,actionIdx,s_prime))
             # Grab the reward from our model of the environment
-            s_tile = self.getTile(s)
-            entry = s_tile
+            # s_tile = self.getTile(s)
+            s_tile = s[0]
+            entry = [s_tile]
             entry.append(actionIdx)
             s_a_entry = tuple(entry)
             r = self.model[s_a_entry]
 
-            # embed()
             # start_state_tiling_hash = random.choice(list(self.Q.keys()))
             # if (not start_state_tiling_hash in self.TilingToState):
             #     embed()
@@ -184,6 +243,7 @@ class DynaQLearner(object):
             # s_prime[0] += s_prime[2] * dt
             # s_prime[1] += s_prime[3] * dt
 
+            # embed()
             self.update(s, actionIdx, s_prime, r)
 
     def save(self):

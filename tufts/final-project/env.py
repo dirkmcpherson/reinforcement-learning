@@ -9,7 +9,8 @@ import random
 class ArmEnv(object):
     viewer = None
     dt = .1    # refresh rate
-    action_bound = [-1, 1]
+    # action_bound = [-1, 1]
+    action_bound = [-20, 20]
     # action_bound = [-0.25, 0.25]
     acceleration_bound = [-0.25, 0.25]
     velocity_bound = [-.3, .3]
@@ -64,10 +65,10 @@ class ArmEnv(object):
         # done and reward
         if self.goal['x'] - self.goal['l']/2 < finger[0] < self.goal['x'] + self.goal['l']/2:
             if self.goal['y'] - self.goal['l']/2 < finger[1] < self.goal['y'] + self.goal['l']/2:
-                r += 1.
+                r += .05
                 self.on_goal += 1
                 if self.on_goal > 10:
-                    r += 10
+                    r += 1
                     done = True
         else:
             # print("Self on goal got to " + str(self.on_goal))
@@ -110,10 +111,12 @@ class ArmEnv(object):
         return np.random.rand(2)-0.5    # two radians
 
     def update_state_from_action(self, s, a):
-        s = [s[i] + a[i] * self.dt for i in range(len(a))]
+        a = np.clip(a, *self.action_bound)
+        s = [s[i] + (a[i] * self.dt) for i in range(len(a))]
         # print("{} += {} * {}".format(s,a,self.dt))
         s = [entry%(np.pi * 2.) for entry in s]
         # print("{}".format(s))
+        s = [round(entry, 2) for entry in s]
         return s
         # return [(s[i] + (a[i] * self.dt)) % 2*np.pi for i in range(len(a))]
 
