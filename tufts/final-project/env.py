@@ -49,6 +49,7 @@ class ArmEnv(object):
         # self.arm_info['r'] %= np.pi * 2    # normalize
         self.arm_info['r'] = self.update_state_from_action(self.arm_info['r'], action)
 
+
         # self.momentum = [10*self.arm_info['v'][0], self.arm_info['v'][1]]
 
         (a1l, a2l) = self.arm_info['l']  # radius, arm length
@@ -65,11 +66,12 @@ class ArmEnv(object):
         # done and reward
         if self.goal['x'] - self.goal['l']/2 < finger[0] < self.goal['x'] + self.goal['l']/2:
             if self.goal['y'] - self.goal['l']/2 < finger[1] < self.goal['y'] + self.goal['l']/2:
-                r += .05
-                self.on_goal += 1
-                if self.on_goal > 10:
-                    r += 1
-                    done = True
+                r += 1
+                done = True
+                # self.on_goal += 1
+                # if self.on_goal > 10:
+                #     r += 1
+                #     done = True
         else:
             # print("Self on goal got to " + str(self.on_goal))
             self.on_goal = 0

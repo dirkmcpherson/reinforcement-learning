@@ -4,6 +4,7 @@ import time
 import learner
 from IPython import embed
 from feedback import Feedback, Valence
+from action import ActionSet
 
 class Subjective:
     def __init__(self, learner):
@@ -15,6 +16,10 @@ class Subjective:
         self.feedback = []
 
         self.learner = learner
+
+        self.windowSize = 50
+
+        self.totalCircles = 0
 
     
     def update(self, environment):
@@ -44,21 +49,47 @@ class Subjective:
         print("Should give feedback {} in {} at {}".format(f.count, f.timeToIssue - time.time(), time.time()))
         self.feedback.append(f)
 
-    def evaluateEnvironment(self, environment):
-        fb = Valence.NEUTRAL
-        # if we like the state of the environment or not
-        # r = random.random()
-        # if (r > 0.97):
-        #     fb = FeedbackType.POSITIVE
-        # elif (r > 0.9):
-        #     fb = FeedbackType.POSITIVE
-        
-        if (environment.momentum[0] < 0):
-            fb = Valence.POSITIVE
-        else:
-            fb = Valence.NEGATIVE
+    # def containsCircle(self, thetas):
 
-        return Feedback(fb)
+
+    def evaluateEnvironment(self):
+        fb = Valence.NEUTRAL
+        history = self.learner.history
+        record = history.record
+        idxs = [i for i in range(len(record))]
+        circle = False
+        for i in idxs:
+            window = history.getHistoryInWindow(i,self.windowSize)
+            if len(window) < (self.windowSize-1):
+                break
+
+            # secondSegment = [entry[0][1] for entry in window]
+            # secondSegment = [ActionSet[entry[1]] for entry in window][1]
+            # p0 = secondSegment[0]
+            # movementRange = sum([entry - p0 for entry in secondSegment[1:]])
+            secondSegment = [ActionSet[entry[1]][1]*0.1 for entry in window]
+            movementRange = sum(secondSegment)
+
+            if (abs(movementRange) >= np.pi):
+                print("Got circle.")
+                circle = True
+                self.learner.acceptFeedback(window, abs(movementRange) / (2*np.pi))
+            elif (abs(movementRange) < np.pi / 10.):
+                print("Not enough movement.")
+                self.learner.acceptFeedback(window, -0.1)
+            else:
+                pass
+                # embed()
+                # time.sleep(1)
+                # print("mr ", movementRange)
+
+        # if (circle):
+        #     self.learner.acceptFeedback(window)
+        #     print("Made a circle!")
+        #     self.totalCircles += 1
+
+
+        # return Feedback(fb)
 
 
 if __name__ == '__main__':
