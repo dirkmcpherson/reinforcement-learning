@@ -45,7 +45,9 @@ class DynaQLearner(object):
 
         # Currently a full Q array is ~2.4gb
         self.Q = self.setupQ(maxVal)
+        self.humanQ = self.setupQ(maxVal)
         self.model = self.setupModel(maxVal)
+        self.humanRewardModel = self.setupModel(maxVal)
 
         self.visitedStates = set()
         # self.visitedStates = dict()
@@ -95,6 +97,22 @@ class DynaQLearner(object):
         # return util.angleToState(round(state[0], 2))
         return self.getTile(state)
 
+    def updateFromHumanFeedback(self,s,a_idx,s_prime,r, updateModel = False):
+        s_tile = self.tileRepresentation(s)
+        entry = s_tile
+        entry.append(a_idx)
+        s_a_entry = tuple(entry)
+        
+        s_prime_tile = self.tileRepresentation(s_prime)
+
+        q0 = self.humanQ[s_a_entry]
+        q1 = np.max(self.humanQ[tuple(s_prime_tile)])
+        self.humanQ[s_a_entry] = q0 + self.alpha * (r + self.gamma * q1 - q0)
+
+        if (updateModel):
+            self.humanRewardModel[s_a_entry] = r
+
+
     def update(self, s, a_idx, s_prime, r, updateModel = False):
         # update out history if we're not doing a modelUpdate
         if (updateModel):
@@ -102,57 +120,22 @@ class DynaQLearner(object):
 
         s_tile = self.tileRepresentation(s)
         entry = s_tile
-            # print("{} took action {} to {} for reward {}".format(s_tile,a_idx,s_prime,r))
-
-        s_prime_tile = self.tileRepresentation(s_prime)
-
         entry.append(a_idx)
         s_a_entry = tuple(entry)
-
-        # if not updateModel:
-        #     embed()
+        
+        s_prime_tile = self.tileRepresentation(s_prime)
 
         q0 = self.Q[s_a_entry]
         q1 = np.max(self.Q[tuple(s_prime_tile)])
-        # Cap the final value because right now it can just accumulate forever (there are several terminal states and termination requires resting on them, so we can't just end as soon as we reach the square)
-        
-        updated = q0 + self.alpha * (r + self.gamma * q1 - q0)
-        # embed()
-        # time.sleep(1)
-        # if (updated > 10):
-            # embed()
-        updated = min(10., updated)
-        self.Q[s_a_entry] = updated
+        self.Q[s_a_entry] = q0 + self.alpha * (r + self.gamma * q1 - q0)
 
-        # print("{} {} to {} for reward {} and to update {} by {} final value {}".format(("" if updateModel else "MODEL"),s_a_entry,s_prime,r,q0,dv,self.Q[s_a_entry]))
-        # print("     q0:{} q1:{} r:{}".format(q0,q1,r))
         if updateModel:
             self.model[s_a_entry] = r
-        else:
-            pass
-        
-        # Saved for hashing tiles
-        # h_s = self.getTiledStateHash(self.getTile(s))
-        # h_s_prime = self.getTiledStateHash(self.getTile(s_prime))
 
-        # if (h_s not in self.Q):
-        #     self.Q[h_s] = action.blankActionValueSet()
-        #     self.TilingToState[h_s] = s
-        #     self.StateReward[h_s] = action.blankActionValueSet()
-
-        # self.StateReward[h_s][a_idx] = r
-
-        # if (h_s_prime not in self.Q):
-        #     self.Q[h_s_prime] = action.blankActionValueSet()
-        #     self.TilingToState[h_s_prime] = s
-        #     self.StateReward[h_s_prime] = action.blankActionValueSet()
-
-        # self.Q[h_s][a_idx] = self.Q[h_s][a_idx] + self.alpha * (r + self.gamma * np.max(self.Q[h_s_prime]) - self.Q[h_s][a_idx])
         
     def acceptFeedback(self, window, reward):
         for (s,a_idx,s_p) in window:
-            self.update(s, a_idx, s_p, reward)
-        return
+            self.updateFromHumanFeedback(s, a_idx, s_p, reward, True)
 
     def sampleAction(self, state):
         # embed()
@@ -162,7 +145,18 @@ class DynaQLearner(object):
             # Select random action
             actionIdx = action.getRandomActionIdx()
         else:
-            actionIdx = util.randomArgMax(self.Q[tuple(tile)])
+
+            # combine the human value and the learned value
+            vals = self.Q[tuple(tile)]
+            humanvals = self.humanQ[tuple(tile)]
+
+            # if sum(humanvals) > 0.01:
+            #     embed()
+            #     time.sleep(1)
+
+            choices = vals + humanvals
+            # print(choices)
+            actionIdx = util.randomArgMax(choices)
             # actionIdx = util.randomArgMax(self.Q[tuple(tile)])
 
 
@@ -248,6 +242,9 @@ class DynaQLearner(object):
 
             # embed()
             self.update(s, actionIdx, s_prime, r)
+
+            humanReward = self.humanRewardModel[tuple(s_a_entry)]
+            self.updateFromHumanFeedback(s, actionIdx, s_prime, humanReward)
             # print("   everything else took: {}".format(time.time() - t0))
             # t0 = time.time()
 

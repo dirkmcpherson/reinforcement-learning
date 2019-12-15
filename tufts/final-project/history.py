@@ -3,11 +3,12 @@ import copy
 
 class History:
     def __init__(self):
-        self.historyLength = 1000
+        self.historyLength = 100
         self.record = []
 
     def push(self, xp):
         if (len(self.record) > self.historyLength):
+            # print("history full")
             self.record.pop(0)
 
         self.record.append(xp)

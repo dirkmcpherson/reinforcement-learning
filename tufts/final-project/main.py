@@ -10,6 +10,7 @@ matplotlib.use("agg")
 import matplotlib.pyplot as plt
 import time
 import sys
+import random
 
 DEBUG = False
 
@@ -79,16 +80,10 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
                 printNonzeroEntries(l)
                 inputAndEmbed()
 
-            o.evaluateEnvironment()
-            # feedback = o.evaluateEnvironment() # Oracle observes the environment so check if it has feedback
-            # if (feedback):
-            #     l.acceptFeedback(o.windowSize)
-
-            # if (numEpisodes < (TotalRunEpisodes/2.)):
-            #     feedback = o.evaluateEnvironment(arm) # Oracle observes the environment so check if it has feedback
-            #     if feedback:
-            #         print("Gave feedback ", feedback.valence)
-            #         l.acceptFeedback(state)
+            # o.evaluateEnvironment()
+            # if (numEpisodes < (3*TotalRunEpisodes/4.) and random.random() > 0.95):
+            if (random.random() > 0.95):
+                o.evaluateEnvironment()
 
             if (goalAchieved):
                 if not AchievedGoal:
@@ -143,6 +138,11 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
 
         # plt.bar(x,y)
         # plt.savefig("visitedStatesModelCount-{}-{}".format(descriptionString,i))
+
+        plt.figure()
+        plt.plot(o.allmotion)
+        plt.savefig("allMotion-{}-{}".format(descriptionString,i))
+
 
         allEpisodes.append(allSteps)
         print("All data:")

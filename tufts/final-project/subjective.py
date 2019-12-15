@@ -17,9 +17,11 @@ class Subjective:
 
         self.learner = learner
 
-        self.windowSize = 50
+        self.windowSize = 5
 
         self.totalCircles = 0
+
+        self.allmotion = []
 
     
     def update(self, environment):
@@ -53,40 +55,61 @@ class Subjective:
 
 
     def evaluateEnvironment(self):
-        fb = Valence.NEUTRAL
         history = self.learner.history
         record = history.record
         idxs = [i for i in range(len(record))]
-        circle = False
         for i in idxs:
             window = history.getHistoryInWindow(i,self.windowSize)
             if len(window) < (self.windowSize-1):
                 break
 
-            # secondSegment = [entry[0][1] for entry in window]
-            # secondSegment = [ActionSet[entry[1]] for entry in window][1]
-            # p0 = secondSegment[0]
-            # movementRange = sum([entry - p0 for entry in secondSegment[1:]])
-            secondSegment = [ActionSet[entry[1]][1]*0.1 for entry in window]
-            movementRange = sum(secondSegment)
+            secondSegment = [ActionSet[entry[1]][1]*0.1 for entry in window] # multiplied by environment.dt
+            # movementRange = sum(secondSegment)
 
-            if (abs(movementRange) >= np.pi):
-                print("Got circle.")
-                circle = True
-                self.learner.acceptFeedback(window, abs(movementRange) / (2*np.pi))
-            elif (abs(movementRange) < np.pi / 10.):
-                print("Not enough movement.")
-                self.learner.acceptFeedback(window, -0.1)
-            else:
-                pass
+            # score is based on how many moves were in the same direction
+            score = 0
+            tmp = 0
+            action = secondSegment[0]
+            # print(secondSegment)
+            for entry in secondSegment[1:]:
+                if (entry != 0) and entry == action:
+                    tmp += 1
+                elif (tmp > score):
+                    score = tmp
+                    tmp = 0
+
+                action = entry
+
+            if (len(self.allmotion) % 1000 == 0):
+                print("secondSegment: ", [round(entry,2) for entry in secondSegment])
+                print("score: ", score)
+                print("================== ", len(self.allmotion))
+            self.allmotion.append(score)
+            self.learner.acceptFeedback(window, score / self.windowSize)
+
+            # if (abs(movementRange) >= np.pi/10.):
+            #     self.allmotion.append(abs(movementRange))
+            #     print("circular motion.")
+            #     circle = True
+            #     self.learner.acceptFeedback(window, abs(movementRange) / (2*np.pi))
+            # else:
+            #     pass
+                # print("Not enough: ", movementRange)
+
+            # elif (abs(movementRange) < np.pi / 10.):
+                # pass
+                # print("Not enough movement.")
+                # self.learner.acceptFeedback(window, -0.1)
+
                 # embed()
                 # time.sleep(1)
                 # print("mr ", movementRange)
-
         # if (circle):
         #     self.learner.acceptFeedback(window)
         #     print("Made a circle!")
         #     self.totalCircles += 1
+
+        
 
 
         # return Feedback(fb)
