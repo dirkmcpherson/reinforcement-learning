@@ -17,7 +17,7 @@ class Subjective:
 
         self.learner = learner
 
-        self.windowSize = 5
+        self.windowSize = 10
 
         self.totalCircles = 0
 
@@ -58,8 +58,12 @@ class Subjective:
         history = self.learner.history
         record = history.record
         idxs = [i for i in range(len(record))]
+        bestWindow = None
+        bestScore = 0
         for i in idxs:
             window = history.getHistoryInWindow(i,self.windowSize)
+            best_idx_s = 0
+            best_idx_f = 0
             if len(window) < (self.windowSize-1):
                 break
 
@@ -68,24 +72,27 @@ class Subjective:
 
             # score is based on how many moves were in the same direction
             score = 0
-            tmp = 0
             action = secondSegment[0]
-            # print(secondSegment)
-            for entry in secondSegment[1:]:
-                if (entry != 0) and entry == action:
-                    tmp += 1
-                elif (tmp > score):
-                    score = tmp
-                    tmp = 0
+            for idx, entry in enumerate(secondSegment[1:]):
+                if (entry != 0) and np.sign(entry) == np.sign(action):
+                    if (score == 0):
+                        best_idx_s = idx
+                    score += 1
+                elif (bestScore < score):
+                    best_idx_f = idx
+                    bestScore = score
+                    bestWindow = window[best_idx_s:best_idx_f+1]
 
                 action = entry
 
-            if (len(self.allmotion) % 1000 == 0):
-                print("secondSegment: ", [round(entry,2) for entry in secondSegment])
-                print("score: ", score)
-                print("================== ", len(self.allmotion))
-            self.allmotion.append(score)
-            self.learner.acceptFeedback(window, score / self.windowSize)
+        # if (len(self.allmotion) % 1000 == 0):
+        #     print("secondSegment: ", [round(entry,2) for entry in secondSegment])
+        #     print("score: ", score)
+        #     print("================== ", len(self.allmotion))
+        self.allmotion.append(bestScore)
+        print("bestwindow: ", bestWindow)
+        if (bestWindow is not None):
+            self.learner.acceptFeedback(bestWindow, bestScore / self.windowSize)
 
             # if (abs(movementRange) >= np.pi/10.):
             #     self.allmotion.append(abs(movementRange))

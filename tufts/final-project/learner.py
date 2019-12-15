@@ -43,6 +43,7 @@ class DynaQLearner(object):
         # self.StateReward = {}
         # self.TilingToState = {}
 
+        self.humanValWeight = 0.3
         # Currently a full Q array is ~2.4gb
         self.Q = self.setupQ(maxVal)
         self.humanQ = self.setupQ(maxVal)
@@ -148,7 +149,7 @@ class DynaQLearner(object):
 
             # combine the human value and the learned value
             vals = self.Q[tuple(tile)]
-            humanvals = self.humanQ[tuple(tile)]
+            humanvals = self.humanValWeight * self.humanQ[tuple(tile)]
 
             # if sum(humanvals) > 0.01:
             #     embed()

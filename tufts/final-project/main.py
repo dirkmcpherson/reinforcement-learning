@@ -140,7 +140,7 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
         # plt.savefig("visitedStatesModelCount-{}-{}".format(descriptionString,i))
 
         plt.figure()
-        plt.plot(o.allmotion)
+        plt.plot([i for i in range(len(o.allmotion))], o.allmotion)
         plt.savefig("allMotion-{}-{}".format(descriptionString,i))
 
 
