@@ -47,8 +47,9 @@ class ArmEnv(object):
         # self.arm_info['r'] += self.arm_info['v'] * self.dt
         # self.arm_info['r'] += action * self.dt    # normalize
         # self.arm_info['r'] %= np.pi * 2    # normalize
-        self.arm_info['r'] = self.update_state_from_action(self.arm_info['r'], action)
-
+        # self.arm_info['r'] = self.update_state_from_action(self.arm_info['r'], action)
+        self.arm_info['r'] = [round(self.arm_info['r'][0] + action[0] * self.dt, 2), round(self.arm_info['r'][1] + action[1] * self.dt, 2)]
+        
 
         # self.momentum = [10*self.arm_info['v'][0], self.arm_info['v'][1]]
 
@@ -60,18 +61,16 @@ class ArmEnv(object):
         # normalize features
         dist1 = [(self.goal['x'] - a1xy_[0]) / 400, (self.goal['y'] - a1xy_[1]) / 400]
         dist2 = [(self.goal['x'] - finger[0]) / 400, (self.goal['y'] - finger[1]) / 400]
-        # r = -np.sqrt(dist2[0]**2+dist2[1]**2)
-        r = 0
+        r = -np.sqrt(dist2[0]**2+dist2[1]**2)
+        # r = 0
 
         # done and reward
         if self.goal['x'] - self.goal['l']/2 < finger[0] < self.goal['x'] + self.goal['l']/2:
             if self.goal['y'] - self.goal['l']/2 < finger[1] < self.goal['y'] + self.goal['l']/2:
                 r += 1
-                done = True
-                # self.on_goal += 1
-                # if self.on_goal > 10:
-                #     r += 1
-                #     done = True
+                self.on_goal += 1
+                if self.on_goal > 30:
+                    done = True
         else:
             # print("Self on goal got to " + str(self.on_goal))
             self.on_goal = 0
@@ -79,30 +78,30 @@ class ArmEnv(object):
         # state
         #s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
         # State is angle of first joint, angle of second joint, velocity of first and second, acceleration of first and second
-        s = self.get_state()
+        s = self.get_state(dist1,dist2)
         return s, r, done
 
-    # def reset(self):
-    #     self.goal['x'] = np.random.rand()*400.
-    #     self.goal['y'] = np.random.rand()*400.
-    #     self.arm_info['r'] = 2 * np.pi * np.random.rand(2)
-    #     self.on_goal = 0
-    #     (a1l, a2l) = self.arm_info['l']  # radius, arm length
-    #     (a1r, a2r) = self.arm_info['r']  # radian, angle
-    #     a1xy = np.array([200., 200.])  # a1 start (x0, y0)
-    #     a1xy_ = np.array([np.cos(a1r), np.sin(a1r)]) * a1l + a1xy  # a1 end and a2 start (x1, y1)
-    #     finger = np.array([np.cos(a1r + a2r), np.sin(a1r + a2r)]) * a2l + a1xy_  # a2 end (x2, y2)
-    #     # normalize features
-    #     dist1 = [(self.goal['x'] - a1xy_[0])/400, (self.goal['y'] - a1xy_[1])/400]
-    #     dist2 = [(self.goal['x'] - finger[0])/400, (self.goal['y'] - finger[1])/400]
-    #     # state
-    #     s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
-    #     return s
-
     def reset(self):
-        self.goal['x'] = 60
-        self.goal['y'] = 60
-        self.arm_info['r'] = np.array([np.pi / 4, 0])
+        self.goal['x'] = 50. + np.random.rand()*300.
+        self.goal['y'] = 50. + np.random.rand()*300.
+        self.arm_info['r'] = 2 * np.pi * np.random.rand(2)
+        # self.on_goal = 0
+        (a1l, a2l) = self.arm_info['l']  # radius, arm length
+        (a1r, a2r) = self.arm_info['r']  # radian, angle
+        a1xy = np.array([200., 200.])  # a1 start (x0, y0)
+        a1xy_ = np.array([np.cos(a1r), np.sin(a1r)]) * a1l + a1xy  # a1 end and a2 start (x1, y1)
+        finger = np.array([np.cos(a1r + a2r), np.sin(a1r + a2r)]) * a2l + a1xy_  # a2 end (x2, y2)
+        # normalize features
+        dist1 = [(self.goal['x'] - a1xy_[0])/400, (self.goal['y'] - a1xy_[1])/400]
+        dist2 = [(self.goal['x'] - finger[0])/400, (self.goal['y'] - finger[1])/400]
+        # state
+        # s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
+        return self.get_state(dist1,dist2)
+
+    # def reset(self):
+    #     self.goal['x'] = 60
+    #     self.goal['y'] = 60
+    #     self.arm_info['r'] = np.array([np.pi / 4, 0])
     
     def render(self):
         if self.viewer is None:
@@ -114,16 +113,44 @@ class ArmEnv(object):
 
     def update_state_from_action(self, s, a):
         a = np.clip(a, *self.action_bound)
+
+        (a1l, a2l) = self.arm_info['l']  # radius, arm length
+        (a1r, a2r) = [s[0], s[1]] # radian, angle
+        a1xy = np.array([200., 200.])  # a1 start (x0, y0)
+        a1xy_ = np.array([np.cos(a1r), np.sin(a1r)]) * a1l + a1xy  # a1 end and a2 start (x1, y1)
+        finger = np.array([np.cos(a1r + a2r), np.sin(a1r + a2r)]) * a2l + a1xy_  # a2 end (x2, y2)
+        # normalize features
+        dist1 = [(self.goal['x'] - a1xy_[0])/400, (self.goal['y'] - a1xy_[1])/400]
+        dist2 = [(self.goal['x'] - finger[0])/400, (self.goal['y'] - finger[1])/400]
+
         s = [s[i] + (a[i] * self.dt) for i in range(len(a))]
-        # print("{} += {} * {}".format(s,a,self.dt))
+
         s = [entry%(np.pi * 2.) for entry in s]
-        # print("{}".format(s))
+        s.append(dist1[0])
+        s.append(dist1[1])
+        s.append(dist2[0])
+        s.append(dist2[1])
+
         s = [round(entry, 2) for entry in s]
         return s
         # return [(s[i] + (a[i] * self.dt)) % 2*np.pi for i in range(len(a))]
 
-    def get_state(self):
-        return (round(self.arm_info['r'][0],2), round(self.arm_info['r'][1],2))
+    def generate_state(self):
+        (a1l, a2l) = self.arm_info['l']  # radius, arm length
+        (a1r, a2r) = self.arm_info['r']  # radian, angle
+        a1xy = np.array([200., 200.])  # a1 start (x0, y0)
+        a1xy_ = np.array([np.cos(a1r), np.sin(a1r)]) * a1l + a1xy  # a1 end and a2 start (x1, y1)
+        finger = np.array([np.cos(a1r + a2r), np.sin(a1r + a2r)]) * a2l + a1xy_  # a2 end (x2, y2)
+        # normalize features
+        dist1 = [(self.goal['x'] - a1xy_[0])/400, (self.goal['y'] - a1xy_[1])/400]
+        dist2 = [(self.goal['x'] - finger[0])/400, (self.goal['y'] - finger[1])/400]
+
+        return self.get_state(dist1,dist2)
+
+    def get_state(self, d0, d1):
+        s = [self.arm_info['r'][0], self.arm_info['r'][1], d0[0], d0[1], d1[0], d1[1]]
+        s = tuple([round(entry,2) for entry in s])
+        return s
         # return (*self.arm_info['r'], *self.arm_info['v'], *self.arm_info['a'])
 
     # Get a random legal state in the environment
@@ -205,9 +232,8 @@ class Viewer(pyglet.window.Window):
 
     # convert the mouse coordinate to goal's coordinate
     def on_mouse_motion(self, x, y, dx, dy):
-        pass
-        # self.goal_info['x'] = x
-        # self.goal_info['y'] = y
+        self.goal_info['x'] = x
+        self.goal_info['y'] = y
 
 
 if __name__ == '__main__':

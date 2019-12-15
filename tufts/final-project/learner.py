@@ -24,7 +24,7 @@ class DynaQLearner(object):
         # Set up the tiling based on a standard random seed
         random.seed()
         self.numTilings = 3 #8
-        self.numDimensions = 2#6
+        self.numDimensions = 6#6
         maxVal = 1000
         vals = [0 for i in range(self.numDimensions)]
         self.iht = tc.IHT(maxVal)

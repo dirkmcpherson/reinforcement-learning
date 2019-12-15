@@ -62,11 +62,8 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
             # print("render took: {}".format(time.time() - t0))
             # t0 = time.time()
 
-            state = arm.get_state()
+            state = arm.generate_state()
             actionIdx = l.sampleAction(state)
-            # indexCount[actionIdx] += 1
-
-            
             newState, reward, goalAchieved = arm.step(action.ActionSet[actionIdx]) # select an action based on the current policy
 
             l.update(state, actionIdx, newState, reward, updateModel=True)
@@ -79,7 +76,7 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
                 printNonzeroEntries(l)
                 inputAndEmbed()
 
-            o.evaluateEnvironment()
+            # o.evaluateEnvironment()
             # feedback = o.evaluateEnvironment() # Oracle observes the environment so check if it has feedback
             # if (feedback):
             #     l.acceptFeedback(o.windowSize)
@@ -173,11 +170,19 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
         # print("Saving learned values and model")
         # l.save()
 
-        arm.viewer.close()
-        del arm
-        del l
+        # arm.viewer.close()
+        # del arm
+        # del l
 
         # embed()
+
+    # Trained, now test it out
+    print("TESTING")
+    while(True):
+        arm.render()
+        actionIdx = l.sampleAction(state)
+        newState, reward, goalAchieved = arm.step(action.ActionSet[actionIdx]) # select an action based on the current policy
+
 
     allMeans = np.mean([np.mean(entry) for entry in allEpisodes])
     print("allMeans: ", allMeans)
@@ -212,7 +217,7 @@ if __name__ == '__main__':
             load = True
 
     numExperiments = 1
-    TotalRunEpisodes = 100
+    TotalRunEpisodes = 300
 
     # withoutDyna = runAll(TotalRunEpisodes, numExperiments, dynaQ=False)
     withDyna = runAll(TotalRunEpisodes, numExperiments, dynaQ=True)
