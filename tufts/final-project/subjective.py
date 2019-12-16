@@ -17,7 +17,7 @@ class Subjective:
 
         self.learner = learner
 
-        self.windowSize = 10
+        self.windowSize = 20
 
         self.totalCircles = 0
 
@@ -90,9 +90,14 @@ class Subjective:
         #     print("score: ", score)
         #     print("================== ", len(self.allmotion))
         self.allmotion.append(bestScore)
-        print("bestwindow: ", bestWindow)
+        # print("bestwindow: ", bestWindow)
         if (bestWindow is not None):
-            self.learner.acceptFeedback(bestWindow, bestScore / self.windowSize)
+            # print("Peak score: ", bestScore)
+            if bestScore <= 3:
+                self.learner.acceptFeedback(bestWindow, -1.)
+            else:
+                self.learner.acceptFeedback(bestWindow, bestScore / self.windowSize)
+
 
             # if (abs(movementRange) >= np.pi/10.):
             #     self.allmotion.append(abs(movementRange))

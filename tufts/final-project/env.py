@@ -18,7 +18,7 @@ class ArmEnv(object):
     state_dim = 9
     action_dim = 2
 
-    def __init__(self):
+    def __init__(self, history):
         self.arm_info = np.zeros(
             2, dtype=[('l', np.float32), ('r', np.float32), ('v', np.float32), ('a', np.float32)])
         self.arm_info['l'] = 100        # 2 arms length
@@ -28,13 +28,14 @@ class ArmEnv(object):
         self.on_goal = 0
 
         # jss
+        self.history = history
         self.momentum = np.zeros(2)
         self.reset()
 
     def printState(self):
         print("s_a = ", self.get_state())
 
-    def step(self, action):
+    def step(self, action, actionIdx):
         #hack
         self.momentum = action
 
@@ -79,7 +80,7 @@ class ArmEnv(object):
         # state
         #s = np.concatenate((a1xy_/200, finger/200, dist1 + dist2, [1. if self.on_goal else 0.]))
         # State is angle of first joint, angle of second joint, velocity of first and second, acceleration of first and second
-        s = self.get_state()
+        s = self.get_state(actionIdx)
         return s, r, done
 
     # def reset(self):
@@ -113,6 +114,7 @@ class ArmEnv(object):
         return np.random.rand(2)-0.5    # two radians
 
     def update_state_from_action(self, s, a):
+        # embed()
         a = np.clip(a, *self.action_bound)
         s = [s[i] + (a[i] * self.dt) for i in range(len(a))]
         # print("{} += {} * {}".format(s,a,self.dt))
@@ -122,8 +124,10 @@ class ArmEnv(object):
         return s
         # return [(s[i] + (a[i] * self.dt)) % 2*np.pi for i in range(len(a))]
 
-    def get_state(self):
-        return (round(self.arm_info['r'][0],2), round(self.arm_info['r'][1],2))
+    def get_state(self, mostRecentAction = None):
+        s = [round(self.arm_info['r'][0],2), round(self.arm_info['r'][1],2)]
+        s.extend(self.history.relevantHistory())
+        return tuple(s)
         # return (*self.arm_info['r'], *self.arm_info['v'], *self.arm_info['a'])
 
     # Get a random legal state in the environment

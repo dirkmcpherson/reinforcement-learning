@@ -12,6 +12,10 @@ ActionSet = {
             1: [-increment, 0.],
             2: [0., increment],
             3: [0., -increment]
+            # 4: [increment, increment],
+            # 5: [increment, -increment],
+            # 6: [-increment, increment],
+            # 7: [-increment, -increment]
         }
 
 def getRandomActionIdx():

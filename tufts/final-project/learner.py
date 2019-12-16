@@ -17,15 +17,20 @@ class DynaQLearner(object):
         self.actionSet = action.ActionSet
 
         self.dynaQUpdates = 50
+        self.humanValWeight = 0.5 # 0.75
 
         self.alpha = 1 #0.5 # learning rate
         self.gamma = 0.9 # future discount
+        self.hgamma = 0.7 # future loopty-loops are worth much less
+        self.maxRandomRate = 0.9
+        self.randomRate = self.maxRandomRate
+        self.start = True
 
         # Set up the tiling based on a standard random seed
         random.seed()
         self.numTilings = 3 #8
-        self.numDimensions = 2#6
-        maxVal = 1000
+        self.numDimensions = 4#6
+        maxVal = 5000
         vals = [0 for i in range(self.numDimensions)]
         self.iht = tc.IHT(maxVal)
 
@@ -36,14 +41,6 @@ class DynaQLearner(object):
         # We need to store the s-a value where our state is the 8d tiling
         #  and action is a change in acceleration
 
-        # we WISH we could do this in an np array, but it would be a 1024^8 size array (where each entry was the action values)
-        # self.Q = np.zeros([self.numTilings, len(self.actionSet)])
-        # Maybe a dictionary will work?
-        # self.Q = {}
-        # self.StateReward = {}
-        # self.TilingToState = {}
-
-        self.humanValWeight = 0.3
         # Currently a full Q array is ~2.4gb
         self.Q = self.setupQ(maxVal)
         self.humanQ = self.setupQ(maxVal)
@@ -51,13 +48,6 @@ class DynaQLearner(object):
         self.humanRewardModel = self.setupModel(maxVal)
 
         self.visitedStates = set()
-        # self.visitedStates = dict()
-
-        # self.visitedStatesCount = dict()
-        # self.visitedStatesModelCount = dict()
-
-        self.normFirst = 0
-        self.dynaFirst = 0
 
     def setupQ(self, maxVal):
         entries = [maxVal for i in range(self.numTilings)]
@@ -82,7 +72,7 @@ class DynaQLearner(object):
 
     def getTile(self, state):
         if (len(state) != self.numDimensions):
-            print("ERROR: unexpected state size for tiling")
+            print("ERROR: unexpected state size for tiling - ", state)
             return None
         else:
             return tc.tiles(self.iht, self.numTilings, state)
@@ -108,7 +98,7 @@ class DynaQLearner(object):
 
         q0 = self.humanQ[s_a_entry]
         q1 = np.max(self.humanQ[tuple(s_prime_tile)])
-        self.humanQ[s_a_entry] = q0 + self.alpha * (r + self.gamma * q1 - q0)
+        self.humanQ[s_a_entry] = q0 + self.alpha * (r + self.hgamma * q1 - q0)
 
         if (updateModel):
             self.humanRewardModel[s_a_entry] = r
@@ -128,23 +118,33 @@ class DynaQLearner(object):
 
         q0 = self.Q[s_a_entry]
         q1 = np.max(self.Q[tuple(s_prime_tile)])
-        self.Q[s_a_entry] = q0 + self.alpha * (r + self.gamma * q1 - q0)
+        self.Q[s_a_entry] = q0 + self.alpha * (r + self.gamma * q1 - q0) #+ (self.humanValWeight * self.humanQ[s_a_entry])
 
         if updateModel:
             self.model[s_a_entry] = r
 
         
     def acceptFeedback(self, window, reward):
+        if (self.start):
+            print("Restarting random rate.")
+            self.randomRate = 0.5
+            self.start = False
+        else:
+            if (self.randomRate < self.maxRandomRate):
+                self.randomRate += 0.0075
+
         for (s,a_idx,s_p) in window:
             self.updateFromHumanFeedback(s, a_idx, s_p, reward, True)
 
     def sampleAction(self, state):
         # embed()
+        # print("Sampling for state: ", state)
         actionIdx = None
         tile = self.tileRepresentation(state)
-        if (random.random() > 0.9):
+        if (random.random() > self.randomRate):
             # Select random action
             actionIdx = action.getRandomActionIdx()
+            # print("Random chosen with rate: ", self.randomRate)
         else:
 
             # combine the human value and the learned value
@@ -202,8 +202,9 @@ class DynaQLearner(object):
             a = action.ActionSet[actionIdx]
 
             s_prime = env.update_state_from_action(s, a)
-            # print("{} + {} for {}".format(s, a, s_prime))
-
+            # add the missing actions
+            s_prime.append(actionIdx) # action we took to get to s_p
+            s_prime.append(int(s[-2])) # action we took before that
 
             # print("--model s{}-{}  a{}  sp{}-{}--".format(s,self.tileRepresentation(s),actionIdx,s_prime,self.tileRepresentation(s_prime)))
             # Grab the reward from our model of the environment
@@ -242,12 +243,14 @@ class DynaQLearner(object):
             # s_prime[1] += s_prime[3] * dt
 
             # embed()
+            # time.sleep(1)
+
+            # Update s_prime
             self.update(s, actionIdx, s_prime, r)
 
+            # DynaQ spread the human reward around too
             humanReward = self.humanRewardModel[tuple(s_a_entry)]
             self.updateFromHumanFeedback(s, actionIdx, s_prime, humanReward)
-            # print("   everything else took: {}".format(time.time() - t0))
-            # t0 = time.time()
 
         # embed()
     def save(self):

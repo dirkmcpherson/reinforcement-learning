@@ -35,6 +35,8 @@ def printNonzeroEntries(l):
 def runAll(TotalRunEpisodes, numExperiments, dynaQ):
     descriptionString = "dynaQ" if dynaQ else "basic"
     allEpisodes = []
+    allHumanScores = []
+    allAngularDistances = []
     for i in range(numExperiments):
         plt.figure(i)
 
@@ -43,8 +45,8 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
 
         step_count = 0
 
-        arm = env.ArmEnv()
         l = learner.DynaQLearner()
+        arm = env.ArmEnv(l.history)
         o = subjective.Subjective(l)
         if (load):
             print("Loading previously learned values and model")
@@ -57,6 +59,8 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
 
         stepstogoal = 0
         allSteps = []
+        angularDistance = 0
+        angularDistances = []
         while(True):
             t0 = time.time()
             arm.render() # render the arm visually
@@ -65,15 +69,24 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
 
             state = arm.get_state()
             actionIdx = l.sampleAction(state)
+            a = action.ActionSet[actionIdx]
             # indexCount[actionIdx] += 1
 
-            
-            newState, reward, goalAchieved = arm.step(action.ActionSet[actionIdx]) # select an action based on the current policy
+            angularDistance += a[1] # only care about end effector
+
+            newState, reward, goalAchieved = arm.step(a, actionIdx) # select an action based on the current policy
+        
+
+            # Fix new state history since history isnt updated until later
+            newState = [newState[0], newState[1], newState[2], newState[3]]
+            newState[-2] = newState[-1]
+            newState[-1] = actionIdx
+            newState = tuple(newState)
+
+            # modify the reward by some smlal amount for each timestep
+            # reward -= 0.001
 
             l.update(state, actionIdx, newState, reward, updateModel=True)
-            # print("q update took: {}".format(time.time() - t0))
-            # t0 = time.time()
-
 
             if (DEBUG):# and numEpisodes <= np.floor(TotalRunEpisodes/2.)):
                 print("--s:{}-{} a{} sp:{}-{} r:{}--".format(state, l.tileRepresentation(state), actionIdx, newState, l.tileRepresentation(newState), reward))
@@ -82,20 +95,22 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
 
             # o.evaluateEnvironment()
             # if (numEpisodes < (3*TotalRunEpisodes/4.) and random.random() > 0.95):
-            if (random.random() > 0.95):
+            if (numEpisodes < (4*TotalRunEpisodes/5.) and random.random() > 0.95):
                 o.evaluateEnvironment()
 
             if (goalAchieved):
                 if not AchievedGoal:
                     print("First goal achieved.")
                     AchievedGoal = True
-                print("Achieved goal at {}".format(newState))
+                print("Achieved goal in {} steps covering distance {} with final random change {}".format(stepstogoal, round(angularDistance,2), l.randomRate))
                 reset(arm)
                 allSteps.append(stepstogoal)
+                angularDistances.append(angularDistance)
                 # print("Episode complete. ", stepstogoal)
                 # print("    mean: ", np.mean(allSteps))
                 # print("    stedev: ", np.std(allSteps))
                 stepstogoal = 0
+                angularDistance = 0
                 numEpisodes -= 1
                 if (numEpisodes <= 0):
                     break
@@ -124,9 +139,6 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
             stepstogoal += 1
             # print("duration: ", time.time() - startTime)
 
-        print("normfirst {}".format(l.normFirst))
-        print("dynafirst {}".format(l.dynaFirst))
-
         # plt.figure()
         # x = [i for i in range(630)]
         # y = []
@@ -139,15 +151,17 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
         # plt.bar(x,y)
         # plt.savefig("visitedStatesModelCount-{}-{}".format(descriptionString,i))
 
+        allHumanScores.append(o.allmotion)
         plt.figure()
         plt.plot([i for i in range(len(o.allmotion))], o.allmotion)
         plt.savefig("allMotion-{}-{}".format(descriptionString,i))
 
+        allAngularDistances.append(angularDistances)
 
         allEpisodes.append(allSteps)
-        print("All data:")
-        for entry in allSteps:
-            print("      ", entry)
+        # print("All data:")
+        # for entry in allSteps:
+        #     print("      ", entry)
         print("Final Mean: ", np.mean(allSteps))
         print("Final stdev: ", np.std(allSteps))
 
@@ -191,7 +205,33 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
     plt.plot(episodicMean)
     plt.savefig("episodicMean-{}-{}".format(descriptionString, i))
 
-    return episodicMean
+    episodicAngularDistance = []
+    for i in range(len(allAngularDistances[0])):
+        total = [entry[i] for entry in allAngularDistances]
+        episodicAngularDistance.append(np.mean(total))
+
+    plt.figure()
+    plt.plot(episodicAngularDistance)
+    plt.savefig("episodicAngularDistance-{}-{}".format(descriptionString, i))
+
+    episodicHumanScores=[]
+    lengths = [len(entry) for entry in allHumanScores]
+    for i in range(len(allHumanScores[np.argmax(lengths)])):
+        total = 0
+        entries = 0
+        for entry in allHumanScores:
+            if (len(entry) <= i):
+                pass
+            else:
+                total += entry[i]
+                entries += 1
+        episodicHumanScores.append(total / entries)
+
+    plt.figure()
+    plt.plot(episodicHumanScores)
+    plt.savefig("episodicHumanScores-{}-{}".format(descriptionString, i))
+
+    return episodicMean, allHumanScores
 
 
 if __name__ == '__main__':
@@ -211,11 +251,11 @@ if __name__ == '__main__':
             save = True
             load = True
 
-    numExperiments = 1
+    numExperiments = 10
     TotalRunEpisodes = 100
 
     # withoutDyna = runAll(TotalRunEpisodes, numExperiments, dynaQ=False)
-    withDyna = runAll(TotalRunEpisodes, numExperiments, dynaQ=True)
+    episodicMean, allHumanScores  = runAll(TotalRunEpisodes, numExperiments, dynaQ=True)
     
     # plt.figure()
     # x = [i for i in range(len(withDyna))]
