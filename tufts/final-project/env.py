@@ -127,6 +127,12 @@ class ArmEnv(object):
     def get_state(self, mostRecentAction = None):
         s = [round(self.arm_info['r'][0],2), round(self.arm_info['r'][1],2)]
         s.extend(self.history.relevantHistory())
+        if (mostRecentAction is not None):
+            s[-3] = s[-2]
+            s[-2] = s[-1]
+            s[-1] = mostRecentAction
+        # else:
+        #     print("Unaltered history to get ", s)
         return tuple(s)
         # return (*self.arm_info['r'], *self.arm_info['v'], *self.arm_info['a'])
 

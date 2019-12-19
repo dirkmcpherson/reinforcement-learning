@@ -13,24 +13,25 @@ pathForTable = "./q_values"
 pathForModel = "./model"
 
 class DynaQLearner(object):
-    def __init__(self):
+    def __init__(self, humanFeedbackWeight = 0.4, resetRandomWeight = False):
         self.actionSet = action.ActionSet
 
         self.dynaQUpdates = 50
-        self.humanValWeight = 0.5 # 0.75
+        self.humanValWeight = 0.4 # 0.75
 
         self.alpha = 1 #0.5 # learning rate
         self.gamma = 0.9 # future discount
-        self.hgamma = 0.7 # future loopty-loops are worth much less
+        self.hgamma = 0.9 # future loopty-loops are worth much less
         self.maxRandomRate = 0.9
         self.randomRate = self.maxRandomRate
         self.start = True
+        self.resetRandomWeight = resetRandomWeight
 
         # Set up the tiling based on a standard random seed
         random.seed()
-        self.numTilings = 3 #8
-        self.numDimensions = 4#6
-        maxVal = 5000
+        self.numTilings = 3#8
+        self.numDimensions = 5#6
+        maxVal = 2000
         vals = [0 for i in range(self.numDimensions)]
         self.iht = tc.IHT(maxVal)
 
@@ -100,6 +101,8 @@ class DynaQLearner(object):
         q1 = np.max(self.humanQ[tuple(s_prime_tile)])
         self.humanQ[s_a_entry] = q0 + self.alpha * (r + self.hgamma * q1 - q0)
 
+        # print("humanQ{} updated with reward {} to {}".format(s_a_entry, round(r,2), round(self.humanQ[s_a_entry], 2)))
+
         if (updateModel):
             self.humanRewardModel[s_a_entry] = r
 
@@ -127,14 +130,24 @@ class DynaQLearner(object):
     def acceptFeedback(self, window, reward):
         if (self.start):
             print("Restarting random rate.")
-            self.randomRate = 0.5
+            if (self.resetRandomWeight):
+                self.randomRate = 0.5
+                self.maxRandomRate = 0.99
             self.start = False
         else:
             if (self.randomRate < self.maxRandomRate):
-                self.randomRate += 0.0075
+                self.randomRate += 0.005
+            # else:
+            #     embed()
 
+        window.reverse()
+        idx = 0
+        originalReward = reward
         for (s,a_idx,s_p) in window:
+            # print("Accepted ", reward)
+            reward = originalReward * (1 - (idx / len(window))) # Linear credit assigner
             self.updateFromHumanFeedback(s, a_idx, s_p, reward, True)
+            idx += 1
 
     def sampleAction(self, state):
         # embed()
@@ -203,8 +216,9 @@ class DynaQLearner(object):
 
             s_prime = env.update_state_from_action(s, a)
             # add the missing actions
+            s_prime.append(int(s[-2])) # action we took 2 steps ago
+            s_prime.append(int(s[-1])) # action we took 1 step ago
             s_prime.append(actionIdx) # action we took to get to s_p
-            s_prime.append(int(s[-2])) # action we took before that
 
             # print("--model s{}-{}  a{}  sp{}-{}--".format(s,self.tileRepresentation(s),actionIdx,s_prime,self.tileRepresentation(s_prime)))
             # Grab the reward from our model of the environment
@@ -249,7 +263,7 @@ class DynaQLearner(object):
             self.update(s, actionIdx, s_prime, r)
 
             # DynaQ spread the human reward around too
-            humanReward = self.humanRewardModel[tuple(s_a_entry)]
+            humanReward = self.humanRewardModel[tuple(s_a_entry)][0]
             self.updateFromHumanFeedback(s, actionIdx, s_prime, humanReward)
 
         # embed()

@@ -7,7 +7,7 @@ from feedback import Feedback, Valence
 from action import ActionSet
 
 class Subjective:
-    def __init__(self, learner):
+    def __init__(self, learner, windowSize=20):
         # Whether to delay feedback or respond immediately
         self.delay = False
         self.delay_mean = 2.5
@@ -82,6 +82,8 @@ class Subjective:
                     best_idx_f = idx
                     bestScore = score
                     bestWindow = window[best_idx_s:best_idx_f+1]
+                    # embed()
+                    # time.sleep(1)
 
                 action = entry
 

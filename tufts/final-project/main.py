@@ -32,7 +32,9 @@ def printNonzeroEntries(l):
             print(""+str(i)+" "+str(vals))
 
 
-def runAll(TotalRunEpisodes, numExperiments, dynaQ):
+def runAll(TotalRunEpisodes, numExperiments, parameters, dynaQ):
+    random.seed(1234)
+
     descriptionString = "dynaQ" if dynaQ else "basic"
     allEpisodes = []
     allHumanScores = []
@@ -45,9 +47,13 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
 
         step_count = 0
 
-        l = learner.DynaQLearner()
+        humanFeedbackWeight = parameters[0]
+        subjectWindowLength = parameters[1]
+        resetRandomWeight = parameters[2]
+
+        l = learner.DynaQLearner(humanFeedbackWeight, resetRandomWeight)
         arm = env.ArmEnv(l.history)
-        o = subjective.Subjective(l)
+        o = subjective.Subjective(l, subjectWindowLength)
         if (load):
             print("Loading previously learned values and model")
             l.load()
@@ -67,21 +73,28 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
             # print("render took: {}".format(time.time() - t0))
             # t0 = time.time()
 
+            # print("-----iteration-----")
             state = arm.get_state()
+            # print("State: ", state)
+
             actionIdx = l.sampleAction(state)
             a = action.ActionSet[actionIdx]
-            # indexCount[actionIdx] += 1
+            # print("Actionidx ", actionIdx)
 
-            angularDistance += a[1] # only care about end effector
+            angularDistance += abs(a[1] * arm.dt) # only care about end effector
 
             newState, reward, goalAchieved = arm.step(a, actionIdx) # select an action based on the current policy
-        
 
             # Fix new state history since history isnt updated until later
-            newState = [newState[0], newState[1], newState[2], newState[3]]
-            newState[-2] = newState[-1]
-            newState[-1] = actionIdx
-            newState = tuple(newState)
+            # print("Original New State: ", newState)
+            # embed()
+            # time.sleep(1)
+            # newState = [entry for entry in newState] #back to list
+            # newState[-3] = newState[-2]
+            # newState[-2] = newState[-1]
+            # newState[-1] = actionIdx
+            # newState = tuple(newState)
+            # print("Altered New State: ", newState)
 
             # modify the reward by some smlal amount for each timestep
             # reward -= 0.001
@@ -98,24 +111,23 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
             if (numEpisodes < (4*TotalRunEpisodes/5.) and random.random() > 0.95):
                 o.evaluateEnvironment()
 
-            if (goalAchieved):
+            if (goalAchieved or stepstogoal > 4000):
                 if not AchievedGoal:
                     print("First goal achieved.")
                     AchievedGoal = True
                 print("Achieved goal in {} steps covering distance {} with final random change {}".format(stepstogoal, round(angularDistance,2), l.randomRate))
                 reset(arm)
-                allSteps.append(stepstogoal)
-                angularDistances.append(angularDistance)
-                # print("Episode complete. ", stepstogoal)
-                # print("    mean: ", np.mean(allSteps))
-                # print("    stedev: ", np.std(allSteps))
-                stepstogoal = 0
+                
+                angularDistances.append(angularDistance/stepstogoal)
                 angularDistance = 0
+
+                allSteps.append(stepstogoal)
+                stepstogoal = 0
+
+
                 numEpisodes -= 1
                 if (numEpisodes <= 0):
                     break
-                # elif (numEpisodes == np.floor(TotalRunEpisodes/2.)):
-                #     embed()
             elif (AchievedGoal): # dont care about updates until we have some reward to propagate
                 if (dynaQ):
                     t0 = time.time()
@@ -231,7 +243,7 @@ def runAll(TotalRunEpisodes, numExperiments, dynaQ):
     plt.plot(episodicHumanScores)
     plt.savefig("episodicHumanScores-{}-{}".format(descriptionString, i))
 
-    return episodicMean, allHumanScores
+    return episodicMean, episodicHumanScores
 
 
 if __name__ == '__main__':
@@ -251,17 +263,34 @@ if __name__ == '__main__':
             save = True
             load = True
 
-    numExperiments = 10
-    TotalRunEpisodes = 100
+    y0s = []
+    y1s = []
 
-    # withoutDyna = runAll(TotalRunEpisodes, numExperiments, dynaQ=False)
-    episodicMean, allHumanScores  = runAll(TotalRunEpisodes, numExperiments, dynaQ=True)
-    
+    params = [(0.4, 20, False), (0.4, 20, True)]
+    numExperiments = 4
+    TotalRunEpisodes = 30
+    for p in params:
+        episodicMean, episodicHumanScores  = runAll(TotalRunEpisodes, numExperiments, p, dynaQ=True)
+        y0s.append(episodicHumanScores)
+        y1s.append(episodicMean)
+
+
+    plt.figure()
+    # embed()
+    plt.plot([i for i in range(len(y0s[0]))], y0s[0], [i for i in range(len(y0s[1]))], y0s[1])
+    plt.legend(['w = 0.4', 'w = 0.6'])
+    plt.title("Human feedback weight vs. Human given scores")
+    plt.savefig("randomscoresparams-{}experiments-{}episodes".format(numExperiments, TotalRunEpisodes))
+
+    plt.figure()
+    plt.plot([i for i in range(len(y1s[0]))], y1s[0], [i for i in range(len(y1s[1]))], y1s[1])
+    plt.legend(['w = 0.4', 'w = 0.6'])
+    plt.title("Human feedback weight vs. episode length")
+    plt.savefig("randomepLengthparams-{}experiments-{}episodes".format(numExperiments, TotalRunEpisodes))
+
     # plt.figure()
     # x = [i for i in range(len(withDyna))]
     # plt.plot(x, withDyna, x, withoutDyna)
-    # plt.legend(['withDyna', 'withoutDyna'])
-    # plt.savefig("episodicComparison-{}experiments-{}episodes".format(numExperiments, TotalRunEpisodes))
 
     # np.save("analytics", np.array(allEpisodes))
     # if (save):

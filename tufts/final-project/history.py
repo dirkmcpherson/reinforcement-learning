@@ -1,9 +1,11 @@
 import numpy as np
 import copy
+from IPython import embed
 
 class History:
     def __init__(self):
         self.historyLength = 100
+        self.relevantEntries = 3
         self.record = []
 
     def push(self, xp):
@@ -12,6 +14,7 @@ class History:
             self.record.pop(0)
 
         self.record.append(xp)
+        # print("history push ", xp)
 
     def getHistoryInWindow(self, startIdx, windowSize):
         if (startIdx > len(self.record)):
@@ -21,18 +24,15 @@ class History:
         return self.record[startIdx:(startIdx+windowSize)]
 
     def relevantHistory(self):
-        # Give the consistency of the last n steps (+n for number of steps clockwise, -n for number of steps counterclockise)
-        numSteps = 2
-        if len(self.record) < numSteps:
-            return [0 for i in range(numSteps)]
-
         relevantHistory = []
-        idx = -1
-        for i in range(numSteps):
-            idx -= i 
-            relevantHistory.append(self.record[idx][1])
+        if len(self.record) < self.relevantEntries:
+            return [0 for i in range(self.relevantEntries)]
 
-        # print("relevantHistory: ", relevantHistory)
+        idx = -self.relevantEntries
+        for i in range(self.relevantEntries):
+            # embed()
+            relevantHistory.append(self.record[idx][1])
+            idx += 1
 
         return relevantHistory
 
