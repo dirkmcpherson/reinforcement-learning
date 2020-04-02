@@ -27,7 +27,7 @@
 
 \section{Problem Statement}
 
-Agents that can modify how they performs specific tasks based on live user feedback can operate more efficiently, provide better service and will be incorporated more naturally into the lives of regular people. Commercially produced agents will be released with a diverse set of off-the-shelf set of abilities, but standard implementations may not cover every individuals needs. Regular people's lives and homes are filled with innumerable quirks and context specific optimalities. A user must be able to to adjust an agent's behavior to fit their own needs and circumstance. In addition, a user who is able to customize their personal agent's actions may also feel a greater sense of self-actualization and agency over the actions of the robot. Recent HRI research has shown that customizability is critical in delivering independence to the user and creating a positive assistive experience \cite{bhattacharjee_community-centered_2019}. 
+Agents that can modify how they performs specific tasks based on live user feedback can operate more efficiently, provide better service and will be incorporated more naturally into the lives of regular people. Commercially produced agents will be manufactured with a diverse set of off-the-shelf set of abilities, but standard implementations may not cover every individuals needs. Regular people's lives and homes are filled with innumerable quirks and context specific optimalities. A user must be able to to adjust an agent's behavior to fit their own needs and circumstance. In addition, a user who is able to customize their personal agent's actions may also feel a greater sense of self-actualization and agency over the actions of the robot. Recent HRI research has shown that customizability is critical in delivering independence to the user and creating a positive assistive experience \cite{bhattacharjee_community-centered_2019}.
 
 We allow for the stylistic customization of a robot arm's movement using a tiled DynaQ learning algorithm that takes simple feedback provided by a user. We attempted to encourage an arm to perform a stylish loop-the-loop motion on its way to the goal.
 
@@ -38,7 +38,7 @@ Incorporating feedback into reinforcement learning systems is a focus of modern 
 Other reinforcement learning algorithms incorporate feedback more intuitively. Policy Shaping \cite{griffith_policy_2013} takes binary feedback from a user for state-action pairs and uses it to determine a policy. It then combines that policy with a traditionally (goal based) learned policy at action selection time in order to decide what to do. Policy Shaping works well but relies on difficult to derive parameters about how consistent the coach is and likely they are to provide feedback. Another algorithm, TAMER \cite{knox_reinforcement_2012} accepts feedback to form a selection policy that it then linearly combines with its traditionally learned policy to select an action. In high frequency environments, TAMER credits feedback to multiple samples based on a distribution. TAMER and Policy Shaping have both been used on games and agent behavior, but not to alter robot arm trajectories. We use a TAMER like algorithm, described in the next section, to add sylistic flair ot an arm's trajectory with sparse feedback.
 
 \section{Algorithm}
-For the learning representation we implemented Tiled Tabular DynaQ. Q-learning is the simplest version of one-step tabular learning. The agent selects an action $A$ in state $S$ to move to state $S'$. The agent updates the value of its current state-action based on the reward $R$ gained by the transition and the difference between the maximum value of the next state and the value of the current state-action (eqn \ref{eqn:eqn0}. Q-learning follows an $\epsilon-greedy$ policy that selects the best possible action for its state most of the time, and explores $\epsilon$-percent of the time. Over many episodes the agent learns which state-actions have high value by propagating any reward it finds throughout the table.
+For the learning representation we implemented Tiled Tabular DynaQ. Q-learning is the simplest version of one-step tabular learning. The agent selects an action $A$ in state $S$ to move to state $S'$. The agent updates the value of its current state-action based on the reward $R$ gained by the transition and the difference between the maximum value of the next state and the value of the current state-action (eqn \ref{eqn:eqn0}). Q-learning follows an $\epsilon$-greedy policy that selects the best possible action for its state most of the time, and explores by selecting a random action $\epsilon$-percent of the time. Over many episodes the agent learns which state-actions have high value by propagating any reward it finds throughout the table.
 
 \begin{equation}\label{eqn:eqn0}
     % \alpha \leftarrow \text{Learning Rate}
@@ -60,7 +60,7 @@ We hold two Q tables, $Q$ is the traditional table which is updated from environ
 At greedy action selection time we choose the action with the highest score after adding the weighted feedback values (equation \ref{aselection}).
 
 \begin{equation}\label{aselection}
-  a = \max(Q(s,a) + w * \hat{H}(s,a))
+  a = \max(Q(s,A) + w * \hat{H}(s,A))
 \end{equation}
 
 \subsection{Tilings}
@@ -91,17 +91,17 @@ We found an implemented 2-DOF robot arm training simulator on github \cite{zhou_
 \label{fig:env-example}
 \end{figure}
 
-Fortunately the environment itself could still be used and would save us the time of building our own (figure \ref{fig:env-example}). We modified the environment to work with our learning representation to allow feedback to alter the behavior of the trajectory. 
+Fortunately the environment itself could still be used and would save us the time of building our own (figure \ref{fig:env-example}). The arm's goal was to move from the top-right corner of the map to a stationary block on the bottom left. 
 
 \subsection{State-Action Representation}
 
-Our agent could take one of four actions. (1) Move the base arm segment clockwise or (2) counter-clockwise by $dtheta$ or (3) move the end-effector clockwise or (4) counter-clockwise by $dtheta$.
+Our agent could take one of four actions. Move the base arm segment (1) clockwise or (2) counter-clockwise by $dtheta$ or (3) move the end-effector clockwise or (4) counter-clockwise by $dtheta$.
 
 The state was the current angular position of each segment of the arm and a brief history of the agent's actions. The last 3 actions were stored in the state to incorporate temporal features into an otherwise markovian model.
 
 \subsection{Subjective Feedback}
 
-We implemented a class, named Subjective, to offer subjective feedback to the agent as it learns. Subjective looks over a windows of history. The history that subjective views is longer than the history held in the agent's state, so the agent has to strategize to keep the subject happy with less information. It follows the simple algorithm shown in Algorithm \ref{alg:subjective}.
+We implemented a class, named Subjective, to offer feedback to the agent as it learns. Subjective looks over a windows of history. The history that subjective views is longer than the history held in the agent's state, so the agent has to strategize to keep the subject happy with less information. It follows the simple algorithm shown in Algorithm \ref{alg:subjective}.
 
 \begin{algorithm}
   \caption{Subjective Feedback} \label{alg:subjective}
@@ -112,8 +112,8 @@ We implemented a class, named Subjective, to offer subjective feedback to the ag
       \STATE $history \leftarrow (s,a,s')$
       \STATE if $random() > 0.95$:
       \bindent
-        \STATE $score \leftarrow viewHistory()$
-        \STATE $learner.acceptFeedback(score)$
+        \STATE $score,window \leftarrow viewHistory()$
+        \STATE $learner.acceptFeedback(score, window)$
       \eindent
      \ENDWHILE
   \end{algorithmic}
@@ -127,24 +127,36 @@ A history of $(s,a,s')$ was kept. The 100 most recent entries were available for
 
 \subsection{Additional tweaks}
 
-We're doing something a little odd in combining $Q$ and $\hat{H}$. Q is a MDP with a terminal state (the arm reaching the box). Meanwhile, $\hat{H}$ is non-markovian because the best action for a state depends on the agent's history and the loop-the-loop has no terminal state. We get around this with a few modifications of the base algorithm. First, we allow the system to train for 25\% of the total episodes before Subjective says anything. This means that $Q$ forms a consistent policy that prioritizes goal attainment before its behavior is skewed by feedback. Then, once feedback starts, we increase our liklihood of selecting a random action, $\epsilon$, and slowly reduce it back to its baseline. This is to allow for the discovery of policies that maximize the human feedback value $\hat{H}$. These two teaks together create behavior that can perform a loop-the-loop while still achieving the goal. 
+We're doing something a little odd in combining $Q$ and $\hat{H}$. Q is an MDP with a terminal state (the arm reaching the box). Meanwhile, $\hat{H}$ is non-markovian because the best action for a state depends on the agent's history and the loop-the-loop has no terminal state. We get around this with a few modifications of the base algorithm. First, we allow the system to train for 25\% of the total episodes before Subjective says anything. This means that $Q$ forms a consistent policy that prioritizes goal attainment before its behavior is skewed by feedback. Then, once feedback starts, we increase our likelihood of selecting a random action, $\epsilon$, and slowly reduce it back to its baseline. This is to allow for the discovery of policies that maximize the human feedback value $\hat{H}$. Figure \ref{fig:random_example} indicates that this tweak works, though the variance of the signal is too high to say anything conclusive. The two tweaks create behavior that can perform a loop-the-loop while still achieving the goal. 
 
-TODO: GRAPHS FOR RANDOM RESTART
-TODO: PROOF PAPER, then just hand it in
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}{.5\textwidth}
+    \includegraphics[width=\linewidth]{randomrestartSCORE.png}
+  \end{subfigure}
+  \begin{subfigure}{.5\textwidth}
+    \includegraphics[width=\linewidth]{randomrestartEP.png}
+  \end{subfigure}
+\caption{Effects of increasing random action selection when introducing feedback on episode length and Subjective feedback score. Random selection was increased to 50\% and then decreased by 0.005\% every time feedback was offered. Average of 4 experiments.}
+\label{fig:random_example}
+\end{figure}
 
 \section{Results}
 
-We found that the agent was able to be trained to do loop-the-loops while still achieving its goal. We were unable to produce graphical examples of this behavior, but the videos found in the presentation linked below show examples of how the agent performs. 
+We found that the agent was able to be trained to do loop-the-loops while still achieving its goal. We were unable to produce graphical examples of this behavior, but the videos found in the presentation linked below show examples of how the agent performs. The increasing score in figure \ref{fig:random_example} indicates that the Subjective's score increases without significantly increasing episode length. This shows that the Subjective saw more loop-the-loop behavior that only minimally impacted the efficieny of goal achievement.
+
+\section{Discussion}
 
 This system was surprisingly sensitive to the parameters that governed learning. If the human feedback was weighed too highly, the agent would happily perform only loop-the-loops and ignore the goal entirely. If the agent did not explore sufficiently, it would never try enough loops to seek them out, and instead only puruse the goal. As you can see in the presented videos, the agent never found a totally smooth balance between its environmental goal (seek the square) and its human-feedack goal (loop-the-loop), but it did find multiple paths that achieved both. The final video in the presentation shows this the best, with the agent directly pursuing the goal via a single loop that completes very near to the goal.  
 
-This experiment demonstrates why combining a markovian goal and a non-markovian goal is a bad idea. The system can learn the desired behavior, but it clearly does not converge to that behavior. A user would have to supervise the agent until it was performing the desired combination of the two goals and then freeze learning, this approach is impractical, requires human oversight, and conflicts with the stated goals of adaptable, user-friendly learning. 
+This experiment demonstrates why combining a markovian goal and a non-markovian goal is a bad idea. The system can learn the desired behavior, but it clearly does not converge to that behavior. A user would have to supervise the agent until it was performing the desired combination of the two goals and then freeze learning, this approach is impractical, requires human oversight, and conflicts with the stated goals of adaptable, user-friendly learning. Our work demonstrates that learning models can combine goal driven behavior with subjective user preference, but more work is required to give a helpful user experience.
 
 \section{Links}
 
 The project repository can be accessed at https://github.com/dirkmcpherson/reinforcement-learning/tree/master/tufts/final-project
 
-The presentation of this project, including videos, can be found at https://docs.google.com/presentation/d/13K5aZEIK0JH4U0TDkoKMD_SiZyz_IO1OupLfK-9WAIg/edit?usp=sharing
+The presentation of this project, including videos, can be found at $https://docs.google.com/presentation/d/13K5aZEIK0JH4U0TDkoKMD_SiZyz_IO1OupLfK-9WAIg/edit?usp=sharing$.
 
 \bibliographystyle{plain}
 \bibliography{final_report}
